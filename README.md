@@ -6,10 +6,13 @@ Sistema integrado de **Refino de Minérios** e **Craft de Equipamentos de Placas
 
 ## 📋 Funcionalidades
 
-1. **Refino Integrado (Cadeia de Produção Vertical):**
-   - Calcula o custo real de produzir cada barra de metal (T2 ao T8.4), considerando o retorno de recursos (sinergia) e a taxa da fundição.
-   - Aplica a receita oficial: barras T4.x utilizam barra T3.0 como base; T5+ utilizam a barra do tier anterior no mesmo nível de encantamento.
-   - Compara automaticamente o **custo de refinar** contra o **preço da barra pronta no mercado**, escolhendo a rota mais barata (ou permitindo escolha manual).
+1. **Refino Estratégico (Cascata Completa vs Barra Anterior Pronta):**
+   - Compara em tempo real os dois métodos de refino:
+     - **Barra Anterior:** Compra a barra T-1 pronta no mercado mais barato + minério bruto do tier (ideal para ciclos rápidos, menos peso de transporte e economia de capital).
+     - **Cascata Completa:** Refina desde o T2 do zero aproveitando todos os retornos de recursos acumulados.
+   - Informa a economia exata em prata por barra entre os dois métodos e indica o vencedor.
+   - Compara também com o **preço da barra pronta no mercado**, escolhendo a rota mais barata (ou permitindo escolha manual por barra).
+   - Decompõe a **Lista de Compras** dinamicamente: se você optar por *Barra Anterior*, a lista pede a barra T-1 e o minério atual sem exigir minérios dos tiers anteriores.
 
 2. **Craft de Equipamentos de Placas:**
    - Cobre **armaduras, elmos e botas** em todos os tiers e encantamentos (**T4.0 ao T8.4** — 600 combinações possíveis).

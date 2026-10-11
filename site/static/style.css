@@ -44,8 +44,12 @@ button.icon:hover{color:var(--red)}
 .neg{color:var(--red);font-weight:600}
 .best{color:var(--accent);font-weight:600}
 .tag{display:inline-block;padding:1px 8px;border-radius:20px;font-size:11px;background:var(--panel2);border:1px solid var(--line)}
-.tag.refinar{color:var(--green);border-color:#2c5a45}
-.tag.comprar{color:var(--blue);border-color:#2b4a6e}
+.tag.refinar,.tag.cascade{color:var(--green);border-color:#2c5a45}
+.tag.step{color:#f0a04b;border-color:#7a4f20}
+.tag.comprar,.tag.buy{color:var(--blue);border-color:#2b4a6e}
+.pill{display:inline-block;padding:2px 7px;border-radius:4px;font-size:11px;font-weight:600}
+.pill.win{background:#173825;color:#4cc38a}
+.pill.tie{background:#232735;color:var(--muted)}
 .grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:16px}
 .subtabs{display:flex;gap:4px;margin:10px 0}
 #toast{position:fixed;right:20px;bottom:20px;background:var(--panel2);border:1px solid var(--accent);padding:10px 16px;border-radius:10px;opacity:0;transition:opacity .3s;pointer-events:none;max-width:420px}

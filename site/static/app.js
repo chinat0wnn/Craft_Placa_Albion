@@ -74,17 +74,73 @@ function computeBars() {
     const ore = minBuy(oreId(k));
     const buy = minBuy(barId(k));
     const fee = iv * 0.1125 * c.feeRefine / 100;
-    const lwEff = lw ? bars[lw].eff : 0;
-    const refine = (ore && lwEff !== null) ? (q * ore.price * (1 + c.taxBuy) + lwEff) * (1 - c.retRefine) + fee : null;
     const buyC = buy ? buy.price * (1 + c.taxBuy) : null;
-    const origin = ST.origins[k] || 'auto';
+    const oreC = ore ? ore.price * (1 + c.taxBuy) : null;
+
+    // 1. Cascata Completa (refinando cada etapa desde o T2)
+    const lwCascade = lw ? (bars[lw] ? bars[lw].cascade : null) : 0;
+    const cascade = (oreC !== null && lwCascade !== null)
+      ? (q * oreC + lwCascade) * (1 - c.retRefine) + fee
+      : null;
+
+    // 2. Refino com Barra Anterior Pronta (comprando a barra T-1 pronta no mercado)
+    const lwBuy = lw ? (bars[lw] ? bars[lw].buyC : null) : null;
+    const step = !lw
+      ? cascade
+      : (oreC !== null && lwBuy !== null)
+        ? (q * oreC + lwBuy) * (1 - c.retRefine) + fee
+        : null;
+
+    const refine = cascade; // compatibilidade com scripts
+
+    // Comparativo entre métodos de refino:
+    // Se stepDiff > 0: Cascata é mais barata por X prata.
+    // Se stepDiff < 0: Barra anterior pronta é mais barata por X prata.
+    const stepDiff = (step !== null && cascade !== null && lw) ? step - cascade : null;
+
+    let bestRefine = null, bestRefineMethod = null;
+    if (cascade !== null && step !== null) {
+      if (cascade <= step) { bestRefine = cascade; bestRefineMethod = 'cascade'; }
+      else { bestRefine = step; bestRefineMethod = 'step'; }
+    } else if (cascade !== null) {
+      bestRefine = cascade; bestRefineMethod = 'cascade';
+    } else if (step !== null) {
+      bestRefine = step; bestRefineMethod = 'step';
+    }
+
+    // Origem / Decisão:
+    let origin = ST.origins[k] || 'auto';
+    if (origin === 'refine') origin = 'auto';
+
     let eff = null, dec = null;
-    if (origin === 'buy') { eff = buyC; dec = 'Comprar'; }
-    else if (origin === 'refine') { eff = refine; dec = 'Refinar'; }
-    else if (refine !== null && (buyC === null || refine <= buyC)) { eff = refine; dec = 'Refinar'; }
-    else if (buyC !== null) { eff = buyC; dec = 'Comprar'; }
-    if (eff === null) dec = null;
-    bars[k] = { k, t, e, iv, q, lw, ore, buy, fee, refine, buyC, eff, dec, origin };
+    if (origin === 'buy') {
+      eff = buyC; dec = 'buy';
+    } else if (origin === 'cascade') {
+      eff = cascade; dec = 'cascade';
+    } else if (origin === 'step') {
+      eff = step; dec = 'step';
+    } else { // 'auto'
+      const candidates = [];
+      if (buyC !== null) candidates.push({ cost: buyC, dec: 'buy' });
+      if (step !== null) candidates.push({ cost: step, dec: 'step' });
+      if (cascade !== null) candidates.push({ cost: cascade, dec: 'cascade' });
+
+      if (candidates.length) {
+        candidates.sort((a, b) => a.cost - b.cost);
+        eff = candidates[0].cost;
+        dec = candidates[0].dec;
+      }
+    }
+
+    const saveVsBuy = (buyC !== null && eff !== null) ? buyC - eff : null;
+
+    bars[k] = {
+      k, t, e, iv, q, lw, ore, oreC, buy, buyC, fee,
+      cascade, step, stepDiff,
+      refine,
+      bestRefine, bestRefineMethod,
+      eff, dec, origin, saveVsBuy
+    };
   }
   return bars;
 }
@@ -117,7 +173,8 @@ function computePlan(bars) {
     const qty = Number(r.qty) || 0;
     return { ...r, qty, it, totalCost: it.cost !== null ? it.cost * qty : null, totalProfit: it.profit !== null ? it.profit * qty : null };
   });
-  // demanda de barras (líquida do retorno de craft)
+
+  // Demanda direta de barras originada pelo craft de equipamentos
   const direct = Object.fromEntries(BAR_KEYS.map(k => [k, 0]));
   const arts = {};
   for (const r of rows) {
@@ -128,29 +185,85 @@ function computePlan(bars) {
       arts[id].qty += r.qty;
     }
   }
-  const total = {};
+
+  // Decomposição da demanda de barras:
+  // - se for 'buy': compra a barra pronta
+  // - se for 'step': compra minério atual + compra barra anterior pronta
+  // - se for 'cascade': compra minério atual + passa demanda para a barra anterior
+  const barDemands = Object.fromEntries(BAR_KEYS.map(k => [k, direct[k] || 0]));
+  const buyBarsMap = {};
+  const buyOreMap = {};
+  const refineStats = {};
+
   for (const k of [...BAR_KEYS].reverse()) {
-    let d = direct[k];
-    for (const k2 of BAR_KEYS) if (lowerBar(k2) === k && bars[k2].dec === 'Refinar') d += total[k2] * (1 - c.retRefine);
-    total[k] = d;
+    const reqQty = barDemands[k];
+    if (!reqQty || reqQty < 1e-9) continue;
+    const b = bars[k];
+    const dec = b.dec || 'buy';
+
+    if (dec === 'buy') {
+      buyBarsMap[k] = (buyBarsMap[k] || 0) + reqQty;
+    } else if (dec === 'step') {
+      const oq = reqQty * b.q * (1 - c.retRefine);
+      buyOreMap[k] = (buyOreMap[k] || 0) + oq;
+      refineStats[k] = (refineStats[k] || 0) + reqQty;
+      if (b.lw) {
+        const prevBarQty = reqQty * (1 - c.retRefine);
+        buyBarsMap[b.lw] = (buyBarsMap[b.lw] || 0) + prevBarQty;
+      }
+    } else { // 'cascade'
+      const oq = reqQty * b.q * (1 - c.retRefine);
+      buyOreMap[k] = (buyOreMap[k] || 0) + oq;
+      refineStats[k] = (refineStats[k] || 0) + reqQty;
+      if (b.lw) {
+        const prevBarQty = reqQty * (1 - c.retRefine);
+        barDemands[b.lw] = (barDemands[b.lw] || 0) + prevBarQty;
+      }
+    }
   }
+
   const buyBars = [], buyOre = [], missing = [];
   for (const k of BAR_KEYS) {
-    const q = total[k]; if (q < 1e-9) continue;
-    const b = bars[k];
-    if (b.dec === 'Comprar') buyBars.push({ k, qty: q, loc: b.buy && b.buy.loc, price: b.buyC, total: q * b.buyC });
-    else if (b.dec === 'Refinar') {
-      const oq = q * b.q * (1 - c.retRefine);
-      buyOre.push({ k, qty: oq, refineQty: q, loc: b.ore.loc, price: b.ore.price * (1 + c.taxBuy), total: oq * b.ore.price * (1 + c.taxBuy) });
-    } else missing.push(`Barra T${k}`);
+    const q = buyBarsMap[k];
+    if (q && q > 1e-9) {
+      const b = bars[k];
+      if (b.buyC === null) missing.push(`Barra pronta T${k}`);
+      buyBars.push({
+        k, qty: q,
+        loc: b.buy ? b.buy.loc : '—',
+        price: b.buyC,
+        total: b.buyC ? q * b.buyC : null
+      });
+    }
   }
-  const artList = Object.values(arts).map(a => ({ ...a, price: a.buy ? a.buy.price * (1 + c.taxBuy) : null, total: a.buy ? a.qty * a.buy.price * (1 + c.taxBuy) : null }));
+  for (const k of BAR_KEYS) {
+    const q = buyOreMap[k];
+    if (q && q > 1e-9) {
+      const b = bars[k];
+      if (!b.ore) missing.push(`Minério T${k}`);
+      buyOre.push({
+        k, qty: q,
+        refineQty: refineStats[k] || 0,
+        loc: b.ore ? b.ore.loc : '—',
+        price: b.oreC,
+        total: b.oreC ? q * b.oreC : null
+      });
+    }
+  }
+
+  const artList = Object.values(arts).map(a => ({
+    ...a,
+    price: a.buy ? a.buy.price * (1 + c.taxBuy) : null,
+    total: a.buy ? a.qty * a.buy.price * (1 + c.taxBuy) : null
+  }));
   artList.filter(a => a.price === null).forEach(a => missing.push(a.art.name));
+
   const sum = arr => arr.reduce((s, x) => s + (x.total || 0), 0);
   const fees = rows.reduce((s, r) => s + r.it.fee * r.qty, 0)
-    + Object.entries(total).reduce((s, [k, q]) => s + (bars[k].dec === 'Refinar' ? q * bars[k].fee : 0), 0);
+    + Object.entries(refineStats).reduce((s, [k, q]) => s + (q * bars[k].fee), 0);
+
   return {
-    rows, buyBars, buyOre, artList, missing, total,
+    rows, buyBars, buyOre, artList, missing, total: barDemands,
     invest: sum(buyBars) + sum(buyOre) + sum(artList), fees,
     cost: rows.reduce((s, r) => s + (r.totalCost || 0), 0),
     revenue: rows.reduce((s, r) => s + (r.it.revenue !== null ? r.it.revenue * r.qty : 0), 0),
@@ -284,24 +397,79 @@ function viewRank() {
 /* ----- Refino ----- */
 function viewRefine() {
   const bars = computeBars();
+  const decLabel = {
+    buy: 'Comprar Pronta',
+    step: 'Barra Anterior',
+    cascade: 'Cascata Total'
+  };
+
   const body = BAR_KEYS.map(k => {
     const b = bars[k];
-    return `<tr><td class="l"><b>T${k}</b></td><td>${b.iv}</td><td class="l">${b.q}× minério + ${b.lw ? '1× barra T' + b.lw : '—'}</td>
-      <td>${b.ore ? fmt(b.ore.price) : '—'}</td><td class="l">${b.ore ? b.ore.loc : ''}</td>
-      <td>${fmt(b.fee, 1)}</td><td>${fmt(b.refine, 1)}</td>
-      <td>${fmt(b.buyC, 1)}</td><td class="l">${b.buy ? b.buy.loc : ''}</td>
-      <td class="l"><select data-origin="${k}">${opt('auto', 'Automático', b.origin)}${opt('refine', 'Refinar', b.origin)}${opt('buy', 'Comprar', b.origin)}</select></td>
+    const lwBar = b.lw ? bars[b.lw] : null;
+
+    // Comparativo entre os dois métodos de refino:
+    let compareHtml = '—';
+    if (b.lw && b.step !== null && b.cascade !== null) {
+      if (b.stepDiff > 1e-2) {
+        compareHtml = `<span class="pill win" title="Cascata economiza ${fmt(b.stepDiff, 1)} de prata por barra">Cascata (-${fmt(b.stepDiff, 0)})</span>`;
+      } else if (b.stepDiff < -1e-2) {
+        compareHtml = `<span class="pill win" style="background:#3b2a14;color:#f0a04b" title="Comprar a barra T-${b.lw} pronta economiza ${fmt(-b.stepDiff, 1)} de prata por barra">Barra Ant. (-${fmt(-b.stepDiff, 0)})</span>`;
+      } else {
+        compareHtml = `<span class="pill tie">Empate</span>`;
+      }
+    } else if (!b.lw) {
+      compareHtml = `<span class="muted">Base (T2)</span>`;
+    }
+
+    const tagClass = b.dec ? b.dec : 'muted';
+    const tagText = b.dec ? (decLabel[b.dec] || b.dec) : 'Sem Preço';
+
+    return `<tr>
+      <td class="l"><b>T${k}</b></td>
+      <td class="l">${b.q}× Minério ${b.ore ? `<span class="muted">(${fmt(b.ore.price)} em ${b.ore.loc})</span>` : '<span class="neg">s/ preço</span>'}</td>
+      <td class="l">${b.lw ? `T${b.lw} <span class="muted">(Mkt: ${fmt(lwBar?.buyC, 0)} | Cascat: ${fmt(lwBar?.cascade, 0)})</span>` : '—'}</td>
+      <td class="${b.step !== null && b.bestRefineMethod === 'step' && b.lw ? 'pos' : ''}">${b.lw ? fmt(b.step, 1) : '—'}</td>
+      <td class="${b.cascade !== null && b.bestRefineMethod === 'cascade' ? 'pos' : ''}">${fmt(b.cascade, 1)}</td>
+      <td>${compareHtml}</td>
+      <td>${b.buyC !== null ? fmt(b.buyC, 1) + (b.buy ? ` <span class="muted">(${b.buy.loc})</span>` : '') : '<span class="muted">—</span>'}</td>
+      <td class="l">
+        <select data-origin="${k}">
+          ${opt('auto', 'Automático (Mais Barato)', b.origin)}
+          ${b.lw ? opt('step', 'Refinar: Barra Anterior Pronta', b.origin) : ''}
+          ${opt('cascade', 'Refinar: Cascata Completa', b.origin)}
+          ${opt('buy', 'Comprar Barra Pronta', b.origin)}
+        </select>
+      </td>
       <td><b class="pos">${fmt(b.eff, 1)}</b></td>
-      <td>${b.dec ? `<span class="tag ${b.dec.toLowerCase()}">${b.dec}</span>` : '<span class="muted">sem preço</span>'}</td>
-      <td class="${b.refine !== null && b.buyC !== null ? cls(b.buyC - b.refine) : ''}">${b.refine !== null && b.buyC !== null ? fmt(b.buyC - b.refine, 1) : '—'}</td></tr>`;
+      <td><span class="tag ${tagClass}">${tagText}</span></td>
+      <td class="${cls(b.saveVsBuy)}">${b.saveVsBuy !== null ? (b.saveVsBuy > 0 ? '+' : '') + fmt(b.saveVsBuy, 1) : '—'}</td>
+    </tr>`;
   }).join('');
+
   return `
-  <h2>Refino de barras · custo unitário real</h2>
-  <div class="muted">Custo ao refinar = (minério + barra inferior) × (1 − retorno) + taxa da fundição. A barra inferior usa o custo efetivo dela (cadeia integrada). T4.x usa a T3.0; T5+ usa a barra inferior do mesmo encantamento.</div>
+  <h2>Refino de Barras · Comparativo Estratégico (Cascata vs Barra Anterior)</h2>
+  <div class="muted">
+    Compare o custo real de refino entre dois métodos:
+    <b>[Barra Anterior]</b> (compra a barra T-1 pronta no mercado mais barato + minério do tier) e 
+    <b>[Cascata Completa]</b> (refina desde o T2 aproveitando os retornos acumulados).
+    O sistema indica qual método gera o menor custo (com a economia em prata por barra) e abastece a Lista de Compras do Planejador de acordo com a sua escolha.
+  </div>
   <div class="tablewrap" style="margin-top:12px"><table>
-    <tr><th class="l">Barra</th><th>Valor item</th><th class="l">Receita</th><th>Minério (menor)</th><th class="l">Cidade</th><th>Taxa fundição</th>
-    <th>Custo ao REFINAR</th><th>Barra pronta</th><th class="l">Cidade</th><th class="l">Origem</th><th>Custo efetivo</th><th>Decisão</th><th>Economia ao refinar</th></tr>
-    ${body}</table></div>`;
+    <tr>
+      <th class="l">Barra</th>
+      <th class="l">Minério Bruto</th>
+      <th class="l">Barra Anterior (T-1)</th>
+      <th>Custo [Barra Anterior]</th>
+      <th>Custo [Cascata]</th>
+      <th>Melhor Método</th>
+      <th>Barra Pronta (Mercado)</th>
+      <th class="l">Origem / Estratégia</th>
+      <th>Custo Efetivo</th>
+      <th>Decisão</th>
+      <th>Economia vs Mercado</th>
+    </tr>
+    ${body}
+  </table></div>`;
 }
 
 /* ----- Preços ----- */
