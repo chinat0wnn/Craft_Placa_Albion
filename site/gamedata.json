@@ -1,0 +1,576 @@
+{
+ "cities": [
+  "Thetford",
+  "Martlock",
+  "Bridgewatch",
+  "Lymhurst",
+  "Fort Sterling"
+ ],
+ "saleLocs": [
+  "Thetford",
+  "Martlock",
+  "Bridgewatch",
+  "Lymhurst",
+  "Fort Sterling",
+  "Caerleon",
+  "Black Market"
+ ],
+ "variants": [
+  {
+   "code": "SET1",
+   "name": "Soldado (Soldier)",
+   "artifact": false
+  },
+  {
+   "code": "SET2",
+   "name": "Cavaleiro (Knight)",
+   "artifact": false
+  },
+  {
+   "code": "SET3",
+   "name": "Guardião (Guardian)",
+   "artifact": false
+  },
+  {
+   "code": "UNDEAD",
+   "name": "Graveguard",
+   "artifact": true
+  },
+  {
+   "code": "HELL",
+   "name": "Demônio (Demon)",
+   "artifact": true
+  },
+  {
+   "code": "KEEPER",
+   "name": "Juiz (Judicator)",
+   "artifact": true
+  },
+  {
+   "code": "FEY",
+   "name": "Duskweaver",
+   "artifact": true
+  },
+  {
+   "code": "AVALON",
+   "name": "Valor",
+   "artifact": true
+  }
+ ],
+ "pieces": [
+  {
+   "slot": "ARMOR",
+   "name": "Armadura",
+   "bars": 16
+  },
+  {
+   "slot": "HEAD",
+   "name": "Elmo",
+   "bars": 8
+  },
+  {
+   "slot": "SHOES",
+   "name": "Botas",
+   "bars": 8
+  }
+ ],
+ "artifacts": {
+  "UNDEAD_ARMOR_4": {
+   "id": "T4_ARTEFACT_ARMOR_PLATE_UNDEAD",
+   "name": "Ancient Chain Rings",
+   "iv": 64
+  },
+  "UNDEAD_ARMOR_5": {
+   "id": "T5_ARTEFACT_ARMOR_PLATE_UNDEAD",
+   "name": "Ancient Chain Rings",
+   "iv": 128
+  },
+  "UNDEAD_ARMOR_6": {
+   "id": "T6_ARTEFACT_ARMOR_PLATE_UNDEAD",
+   "name": "Ancient Chain Rings",
+   "iv": 256
+  },
+  "UNDEAD_ARMOR_7": {
+   "id": "T7_ARTEFACT_ARMOR_PLATE_UNDEAD",
+   "name": "Ancient Chain Rings",
+   "iv": 512
+  },
+  "UNDEAD_ARMOR_8": {
+   "id": "T8_ARTEFACT_ARMOR_PLATE_UNDEAD",
+   "name": "Ancient Chain Rings",
+   "iv": 1024
+  },
+  "UNDEAD_HEAD_4": {
+   "id": "T4_ARTEFACT_HEAD_PLATE_UNDEAD",
+   "name": "Ancient Padding",
+   "iv": 32
+  },
+  "UNDEAD_HEAD_5": {
+   "id": "T5_ARTEFACT_HEAD_PLATE_UNDEAD",
+   "name": "Ancient Padding",
+   "iv": 64
+  },
+  "UNDEAD_HEAD_6": {
+   "id": "T6_ARTEFACT_HEAD_PLATE_UNDEAD",
+   "name": "Ancient Padding",
+   "iv": 128
+  },
+  "UNDEAD_HEAD_7": {
+   "id": "T7_ARTEFACT_HEAD_PLATE_UNDEAD",
+   "name": "Ancient Padding",
+   "iv": 256
+  },
+  "UNDEAD_HEAD_8": {
+   "id": "T8_ARTEFACT_HEAD_PLATE_UNDEAD",
+   "name": "Ancient Padding",
+   "iv": 512
+  },
+  "UNDEAD_SHOES_4": {
+   "id": "T4_ARTEFACT_SHOES_PLATE_UNDEAD",
+   "name": "Ancient Bindings",
+   "iv": 32
+  },
+  "UNDEAD_SHOES_5": {
+   "id": "T5_ARTEFACT_SHOES_PLATE_UNDEAD",
+   "name": "Ancient Bindings",
+   "iv": 64
+  },
+  "UNDEAD_SHOES_6": {
+   "id": "T6_ARTEFACT_SHOES_PLATE_UNDEAD",
+   "name": "Ancient Bindings",
+   "iv": 128
+  },
+  "UNDEAD_SHOES_7": {
+   "id": "T7_ARTEFACT_SHOES_PLATE_UNDEAD",
+   "name": "Ancient Bindings",
+   "iv": 256
+  },
+  "UNDEAD_SHOES_8": {
+   "id": "T8_ARTEFACT_SHOES_PLATE_UNDEAD",
+   "name": "Ancient Bindings",
+   "iv": 512
+  },
+  "HELL_ARMOR_4": {
+   "id": "T4_ARTEFACT_ARMOR_PLATE_HELL",
+   "name": "Demonic Plates",
+   "iv": 192
+  },
+  "HELL_ARMOR_5": {
+   "id": "T5_ARTEFACT_ARMOR_PLATE_HELL",
+   "name": "Demonic Plates",
+   "iv": 384
+  },
+  "HELL_ARMOR_6": {
+   "id": "T6_ARTEFACT_ARMOR_PLATE_HELL",
+   "name": "Demonic Plates",
+   "iv": 768
+  },
+  "HELL_ARMOR_7": {
+   "id": "T7_ARTEFACT_ARMOR_PLATE_HELL",
+   "name": "Demonic Plates",
+   "iv": 1536
+  },
+  "HELL_ARMOR_8": {
+   "id": "T8_ARTEFACT_ARMOR_PLATE_HELL",
+   "name": "Demonic Plates",
+   "iv": 3072
+  },
+  "HELL_HEAD_4": {
+   "id": "T4_ARTEFACT_HEAD_PLATE_HELL",
+   "name": "Demonic Scraps",
+   "iv": 96
+  },
+  "HELL_HEAD_5": {
+   "id": "T5_ARTEFACT_HEAD_PLATE_HELL",
+   "name": "Demonic Scraps",
+   "iv": 192
+  },
+  "HELL_HEAD_6": {
+   "id": "T6_ARTEFACT_HEAD_PLATE_HELL",
+   "name": "Demonic Scraps",
+   "iv": 384
+  },
+  "HELL_HEAD_7": {
+   "id": "T7_ARTEFACT_HEAD_PLATE_HELL",
+   "name": "Demonic Scraps",
+   "iv": 768
+  },
+  "HELL_HEAD_8": {
+   "id": "T8_ARTEFACT_HEAD_PLATE_HELL",
+   "name": "Demonic Scraps",
+   "iv": 1536
+  },
+  "HELL_SHOES_4": {
+   "id": "T4_ARTEFACT_SHOES_PLATE_HELL",
+   "name": "Demonic Filling",
+   "iv": 96
+  },
+  "HELL_SHOES_5": {
+   "id": "T5_ARTEFACT_SHOES_PLATE_HELL",
+   "name": "Demonic Filling",
+   "iv": 192
+  },
+  "HELL_SHOES_6": {
+   "id": "T6_ARTEFACT_SHOES_PLATE_HELL",
+   "name": "Demonic Filling",
+   "iv": 384
+  },
+  "HELL_SHOES_7": {
+   "id": "T7_ARTEFACT_SHOES_PLATE_HELL",
+   "name": "Demonic Filling",
+   "iv": 768
+  },
+  "HELL_SHOES_8": {
+   "id": "T8_ARTEFACT_SHOES_PLATE_HELL",
+   "name": "Demonic Filling",
+   "iv": 1536
+  },
+  "KEEPER_ARMOR_4": {
+   "id": "T4_ARTEFACT_ARMOR_PLATE_KEEPER",
+   "name": "Preserved Animal Fur",
+   "iv": 448
+  },
+  "KEEPER_ARMOR_5": {
+   "id": "T5_ARTEFACT_ARMOR_PLATE_KEEPER",
+   "name": "Preserved Animal Fur",
+   "iv": 896
+  },
+  "KEEPER_ARMOR_6": {
+   "id": "T6_ARTEFACT_ARMOR_PLATE_KEEPER",
+   "name": "Preserved Animal Fur",
+   "iv": 1792
+  },
+  "KEEPER_ARMOR_7": {
+   "id": "T7_ARTEFACT_ARMOR_PLATE_KEEPER",
+   "name": "Preserved Animal Fur",
+   "iv": 3584
+  },
+  "KEEPER_ARMOR_8": {
+   "id": "T8_ARTEFACT_ARMOR_PLATE_KEEPER",
+   "name": "Preserved Animal Fur",
+   "iv": 7168
+  },
+  "KEEPER_HEAD_4": {
+   "id": "T4_ARTEFACT_HEAD_PLATE_KEEPER",
+   "name": "Carved Skull Padding",
+   "iv": 224
+  },
+  "KEEPER_HEAD_5": {
+   "id": "T5_ARTEFACT_HEAD_PLATE_KEEPER",
+   "name": "Carved Skull Padding",
+   "iv": 448
+  },
+  "KEEPER_HEAD_6": {
+   "id": "T6_ARTEFACT_HEAD_PLATE_KEEPER",
+   "name": "Carved Skull Padding",
+   "iv": 896
+  },
+  "KEEPER_HEAD_7": {
+   "id": "T7_ARTEFACT_HEAD_PLATE_KEEPER",
+   "name": "Carved Skull Padding",
+   "iv": 1792
+  },
+  "KEEPER_HEAD_8": {
+   "id": "T8_ARTEFACT_HEAD_PLATE_KEEPER",
+   "name": "Carved Skull Padding",
+   "iv": 3584
+  },
+  "KEEPER_SHOES_4": {
+   "id": "T4_ARTEFACT_SHOES_PLATE_KEEPER",
+   "name": "Inscribed Bindings",
+   "iv": 224
+  },
+  "KEEPER_SHOES_5": {
+   "id": "T5_ARTEFACT_SHOES_PLATE_KEEPER",
+   "name": "Inscribed Bindings",
+   "iv": 448
+  },
+  "KEEPER_SHOES_6": {
+   "id": "T6_ARTEFACT_SHOES_PLATE_KEEPER",
+   "name": "Inscribed Bindings",
+   "iv": 896
+  },
+  "KEEPER_SHOES_7": {
+   "id": "T7_ARTEFACT_SHOES_PLATE_KEEPER",
+   "name": "Inscribed Bindings",
+   "iv": 1792
+  },
+  "KEEPER_SHOES_8": {
+   "id": "T8_ARTEFACT_SHOES_PLATE_KEEPER",
+   "name": "Inscribed Bindings",
+   "iv": 3584
+  },
+  "FEY_ARMOR_4": {
+   "id": "T4_ARTEFACT_ARMOR_PLATE_FEY",
+   "name": "Veilweaver Carapace",
+   "iv": 448
+  },
+  "FEY_ARMOR_5": {
+   "id": "T5_ARTEFACT_ARMOR_PLATE_FEY",
+   "name": "Veilweaver Carapace",
+   "iv": 896
+  },
+  "FEY_ARMOR_6": {
+   "id": "T6_ARTEFACT_ARMOR_PLATE_FEY",
+   "name": "Veilweaver Carapace",
+   "iv": 1792
+  },
+  "FEY_ARMOR_7": {
+   "id": "T7_ARTEFACT_ARMOR_PLATE_FEY",
+   "name": "Veilweaver Carapace",
+   "iv": 3584
+  },
+  "FEY_ARMOR_8": {
+   "id": "T8_ARTEFACT_ARMOR_PLATE_FEY",
+   "name": "Veilweaver Carapace",
+   "iv": 7168
+  },
+  "FEY_HEAD_4": {
+   "id": "T4_ARTEFACT_HEAD_PLATE_FEY",
+   "name": "Veilweaver Mandibles",
+   "iv": 224
+  },
+  "FEY_HEAD_5": {
+   "id": "T5_ARTEFACT_HEAD_PLATE_FEY",
+   "name": "Veilweaver Mandibles",
+   "iv": 448
+  },
+  "FEY_HEAD_6": {
+   "id": "T6_ARTEFACT_HEAD_PLATE_FEY",
+   "name": "Veilweaver Mandibles",
+   "iv": 896
+  },
+  "FEY_HEAD_7": {
+   "id": "T7_ARTEFACT_HEAD_PLATE_FEY",
+   "name": "Veilweaver Mandibles",
+   "iv": 1792
+  },
+  "FEY_HEAD_8": {
+   "id": "T8_ARTEFACT_HEAD_PLATE_FEY",
+   "name": "Veilweaver Mandibles",
+   "iv": 3584
+  },
+  "FEY_SHOES_4": {
+   "id": "T4_ARTEFACT_SHOES_PLATE_FEY",
+   "name": "Veilweaver Claws",
+   "iv": 224
+  },
+  "FEY_SHOES_5": {
+   "id": "T5_ARTEFACT_SHOES_PLATE_FEY",
+   "name": "Veilweaver Claws",
+   "iv": 448
+  },
+  "FEY_SHOES_6": {
+   "id": "T6_ARTEFACT_SHOES_PLATE_FEY",
+   "name": "Veilweaver Claws",
+   "iv": 896
+  },
+  "FEY_SHOES_7": {
+   "id": "T7_ARTEFACT_SHOES_PLATE_FEY",
+   "name": "Veilweaver Claws",
+   "iv": 1792
+  },
+  "FEY_SHOES_8": {
+   "id": "T8_ARTEFACT_SHOES_PLATE_FEY",
+   "name": "Veilweaver Claws",
+   "iv": 3584
+  },
+  "AVALON_ARMOR_4": {
+   "id": "T4_ARTEFACT_ARMOR_PLATE_AVALON",
+   "name": "Exalted Plating",
+   "iv": 960
+  },
+  "AVALON_ARMOR_5": {
+   "id": "T5_ARTEFACT_ARMOR_PLATE_AVALON",
+   "name": "Exalted Plating",
+   "iv": 1920
+  },
+  "AVALON_ARMOR_6": {
+   "id": "T6_ARTEFACT_ARMOR_PLATE_AVALON",
+   "name": "Exalted Plating",
+   "iv": 3840
+  },
+  "AVALON_ARMOR_7": {
+   "id": "T7_ARTEFACT_ARMOR_PLATE_AVALON",
+   "name": "Exalted Plating",
+   "iv": 7680
+  },
+  "AVALON_ARMOR_8": {
+   "id": "T8_ARTEFACT_ARMOR_PLATE_AVALON",
+   "name": "Exalted Plating",
+   "iv": 15360
+  },
+  "AVALON_HEAD_4": {
+   "id": "T4_ARTEFACT_HEAD_PLATE_AVALON",
+   "name": "Exalted Visor",
+   "iv": 480
+  },
+  "AVALON_HEAD_5": {
+   "id": "T5_ARTEFACT_HEAD_PLATE_AVALON",
+   "name": "Exalted Visor",
+   "iv": 960
+  },
+  "AVALON_HEAD_6": {
+   "id": "T6_ARTEFACT_HEAD_PLATE_AVALON",
+   "name": "Exalted Visor",
+   "iv": 1920
+  },
+  "AVALON_HEAD_7": {
+   "id": "T7_ARTEFACT_HEAD_PLATE_AVALON",
+   "name": "Exalted Visor",
+   "iv": 3840
+  },
+  "AVALON_HEAD_8": {
+   "id": "T8_ARTEFACT_HEAD_PLATE_AVALON",
+   "name": "Exalted Visor",
+   "iv": 7680
+  },
+  "AVALON_SHOES_4": {
+   "id": "T4_ARTEFACT_SHOES_PLATE_AVALON",
+   "name": "Exalted Greave",
+   "iv": 480
+  },
+  "AVALON_SHOES_5": {
+   "id": "T5_ARTEFACT_SHOES_PLATE_AVALON",
+   "name": "Exalted Greave",
+   "iv": 960
+  },
+  "AVALON_SHOES_6": {
+   "id": "T6_ARTEFACT_SHOES_PLATE_AVALON",
+   "name": "Exalted Greave",
+   "iv": 1920
+  },
+  "AVALON_SHOES_7": {
+   "id": "T7_ARTEFACT_SHOES_PLATE_AVALON",
+   "name": "Exalted Greave",
+   "iv": 3840
+  },
+  "AVALON_SHOES_8": {
+   "id": "T8_ARTEFACT_SHOES_PLATE_AVALON",
+   "name": "Exalted Greave",
+   "iv": 7680
+  }
+ },
+ "itemNames": {
+  "T4_ARMOR_PLATE_SET1": "Adept's Soldier Armor",
+  "T5_ARMOR_PLATE_SET1": "Expert's Soldier Armor",
+  "T6_ARMOR_PLATE_SET1": "Master's Soldier Armor",
+  "T7_ARMOR_PLATE_SET1": "Grandmaster's Soldier Armor",
+  "T8_ARMOR_PLATE_SET1": "Elder's Soldier Armor",
+  "T4_HEAD_PLATE_SET1": "Adept's Soldier Helmet",
+  "T5_HEAD_PLATE_SET1": "Expert's Soldier Helmet",
+  "T6_HEAD_PLATE_SET1": "Master's Soldier Helmet",
+  "T7_HEAD_PLATE_SET1": "Grandmaster's Soldier Helmet",
+  "T8_HEAD_PLATE_SET1": "Elder's Soldier Helmet",
+  "T4_SHOES_PLATE_SET1": "Adept's Soldier Boots",
+  "T5_SHOES_PLATE_SET1": "Expert's Soldier Boots",
+  "T6_SHOES_PLATE_SET1": "Master's Soldier Boots",
+  "T7_SHOES_PLATE_SET1": "Grandmaster's Soldier Boots",
+  "T8_SHOES_PLATE_SET1": "Elder's Soldier Boots",
+  "T4_ARMOR_PLATE_SET2": "Adept's Knight Armor",
+  "T5_ARMOR_PLATE_SET2": "Expert's Knight Armor",
+  "T6_ARMOR_PLATE_SET2": "Master's Knight Armor",
+  "T7_ARMOR_PLATE_SET2": "Grandmaster's Knight Armor",
+  "T8_ARMOR_PLATE_SET2": "Elder's Knight Armor",
+  "T4_HEAD_PLATE_SET2": "Adept's Knight Helmet",
+  "T5_HEAD_PLATE_SET2": "Expert's Knight Helmet",
+  "T6_HEAD_PLATE_SET2": "Master's Knight Helmet",
+  "T7_HEAD_PLATE_SET2": "Grandmaster's Knight Helmet",
+  "T8_HEAD_PLATE_SET2": "Elder's Knight Helmet",
+  "T4_SHOES_PLATE_SET2": "Adept's Knight Boots",
+  "T5_SHOES_PLATE_SET2": "Expert's Knight Boots",
+  "T6_SHOES_PLATE_SET2": "Master's Knight Boots",
+  "T7_SHOES_PLATE_SET2": "Grandmaster's Knight Boots",
+  "T8_SHOES_PLATE_SET2": "Elder's Knight Boots",
+  "T4_ARMOR_PLATE_SET3": "Adept's Guardian Armor",
+  "T5_ARMOR_PLATE_SET3": "Expert's Guardian Armor",
+  "T6_ARMOR_PLATE_SET3": "Master's Guardian Armor",
+  "T7_ARMOR_PLATE_SET3": "Grandmaster's Guardian Armor",
+  "T8_ARMOR_PLATE_SET3": "Elder's Guardian Armor",
+  "T4_HEAD_PLATE_SET3": "Adept's Guardian Helmet",
+  "T5_HEAD_PLATE_SET3": "Expert's Guardian Helmet",
+  "T6_HEAD_PLATE_SET3": "Master's Guardian Helmet",
+  "T7_HEAD_PLATE_SET3": "Grandmaster's Guardian Helmet",
+  "T8_HEAD_PLATE_SET3": "Elder's Guardian Helmet",
+  "T4_SHOES_PLATE_SET3": "Adept's Guardian Boots",
+  "T5_SHOES_PLATE_SET3": "Expert's Guardian Boots",
+  "T6_SHOES_PLATE_SET3": "Master's Guardian Boots",
+  "T7_SHOES_PLATE_SET3": "Grandmaster's Guardian Boots",
+  "T8_SHOES_PLATE_SET3": "Elder's Guardian Boots",
+  "T4_ARMOR_PLATE_UNDEAD": "Adept's Graveguard Armor",
+  "T5_ARMOR_PLATE_UNDEAD": "Expert's Graveguard Armor",
+  "T6_ARMOR_PLATE_UNDEAD": "Master's Graveguard Armor",
+  "T7_ARMOR_PLATE_UNDEAD": "Grandmaster's Graveguard Armor",
+  "T8_ARMOR_PLATE_UNDEAD": "Elder's Graveguard Armor",
+  "T4_HEAD_PLATE_UNDEAD": "Adept's Graveguard Helmet",
+  "T5_HEAD_PLATE_UNDEAD": "Expert's Graveguard Helmet",
+  "T6_HEAD_PLATE_UNDEAD": "Master's Graveguard Helmet",
+  "T7_HEAD_PLATE_UNDEAD": "Grandmaster's Graveguard Helmet",
+  "T8_HEAD_PLATE_UNDEAD": "Elder's Graveguard Helmet",
+  "T4_SHOES_PLATE_UNDEAD": "Adept's Graveguard Boots",
+  "T5_SHOES_PLATE_UNDEAD": "Expert's Graveguard Boots",
+  "T6_SHOES_PLATE_UNDEAD": "Master's Graveguard Boots",
+  "T7_SHOES_PLATE_UNDEAD": "Grandmaster's Graveguard Boots",
+  "T8_SHOES_PLATE_UNDEAD": "Elder's Graveguard Boots",
+  "T4_ARMOR_PLATE_HELL": "Adept's Demon Armor",
+  "T5_ARMOR_PLATE_HELL": "Expert's Demon Armor",
+  "T6_ARMOR_PLATE_HELL": "Master's Demon Armor",
+  "T7_ARMOR_PLATE_HELL": "Grandmaster's Demon Armor",
+  "T8_ARMOR_PLATE_HELL": "Elder's Demon Armor",
+  "T4_HEAD_PLATE_HELL": "Adept's Demon Helmet",
+  "T5_HEAD_PLATE_HELL": "Expert's Demon Helmet",
+  "T6_HEAD_PLATE_HELL": "Master's Demon Helmet",
+  "T7_HEAD_PLATE_HELL": "Grandmaster's Demon Helmet",
+  "T8_HEAD_PLATE_HELL": "Elder's Demon Helmet",
+  "T4_SHOES_PLATE_HELL": "Adept's Demon Boots",
+  "T5_SHOES_PLATE_HELL": "Expert's Demon Boots",
+  "T6_SHOES_PLATE_HELL": "Master's Demon Boots",
+  "T7_SHOES_PLATE_HELL": "Grandmaster's Demon Boots",
+  "T8_SHOES_PLATE_HELL": "Elder's Demon Boots",
+  "T4_ARMOR_PLATE_KEEPER": "Adept's Judicator Armor",
+  "T5_ARMOR_PLATE_KEEPER": "Expert's Judicator Armor",
+  "T6_ARMOR_PLATE_KEEPER": "Master's Judicator Armor",
+  "T7_ARMOR_PLATE_KEEPER": "Grandmaster's Judicator Armor",
+  "T8_ARMOR_PLATE_KEEPER": "Elder's Judicator Armor",
+  "T4_HEAD_PLATE_KEEPER": "Adept's Judicator Helmet",
+  "T5_HEAD_PLATE_KEEPER": "Expert's Judicator Helmet",
+  "T6_HEAD_PLATE_KEEPER": "Master's Judicator Helmet",
+  "T7_HEAD_PLATE_KEEPER": "Grandmaster's Judicator Helmet",
+  "T8_HEAD_PLATE_KEEPER": "Elder's Judicator Helmet",
+  "T4_SHOES_PLATE_KEEPER": "Adept's Judicator Boots",
+  "T5_SHOES_PLATE_KEEPER": "Expert's Judicator Boots",
+  "T6_SHOES_PLATE_KEEPER": "Master's Judicator Boots",
+  "T7_SHOES_PLATE_KEEPER": "Grandmaster's Judicator Boots",
+  "T8_SHOES_PLATE_KEEPER": "Elder's Judicator Boots",
+  "T4_ARMOR_PLATE_FEY": "Adept's Duskweaver Armor",
+  "T5_ARMOR_PLATE_FEY": "Expert's Duskweaver Armor",
+  "T6_ARMOR_PLATE_FEY": "Master's Duskweaver Armor",
+  "T7_ARMOR_PLATE_FEY": "Grandmaster's Duskweaver Armor",
+  "T8_ARMOR_PLATE_FEY": "Elder's Duskweaver Armor",
+  "T4_HEAD_PLATE_FEY": "Adept's Duskweaver Helmet",
+  "T5_HEAD_PLATE_FEY": "Expert's Duskweaver Helmet",
+  "T6_HEAD_PLATE_FEY": "Master's Duskweaver Helmet",
+  "T7_HEAD_PLATE_FEY": "Grandmaster's Duskweaver Helmet",
+  "T8_HEAD_PLATE_FEY": "Elder's Duskweaver Helmet",
+  "T4_SHOES_PLATE_FEY": "Adept's Duskweaver Boots",
+  "T5_SHOES_PLATE_FEY": "Expert's Duskweaver Boots",
+  "T6_SHOES_PLATE_FEY": "Master's Duskweaver Boots",
+  "T7_SHOES_PLATE_FEY": "Grandmaster's Duskweaver Boots",
+  "T8_SHOES_PLATE_FEY": "Elder's Duskweaver Boots",
+  "T4_ARMOR_PLATE_AVALON": "Adept's Armor of Valor",
+  "T5_ARMOR_PLATE_AVALON": "Expert's Armor of Valor",
+  "T6_ARMOR_PLATE_AVALON": "Master's Armor of Valor",
+  "T7_ARMOR_PLATE_AVALON": "Grandmaster's Armor of Valor",
+  "T8_ARMOR_PLATE_AVALON": "Elder's Armor of Valor",
+  "T4_HEAD_PLATE_AVALON": "Adept's Helmet of Valor",
+  "T5_HEAD_PLATE_AVALON": "Expert's Helmet of Valor",
+  "T6_HEAD_PLATE_AVALON": "Master's Helmet of Valor",
+  "T7_HEAD_PLATE_AVALON": "Grandmaster's Helmet of Valor",
+  "T8_HEAD_PLATE_AVALON": "Elder's Helmet of Valor",
+  "T4_SHOES_PLATE_AVALON": "Adept's Boots of Valor",
+  "T5_SHOES_PLATE_AVALON": "Expert's Boots of Valor",
+  "T6_SHOES_PLATE_AVALON": "Master's Boots of Valor",
+  "T7_SHOES_PLATE_AVALON": "Grandmaster's Boots of Valor",
+  "T8_SHOES_PLATE_AVALON": "Elder's Boots of Valor"
+ }
+}

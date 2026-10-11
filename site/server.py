@@ -1,0 +1,87 @@
+"""Servidor local do Albion Craft (somente biblioteca padrao do Python).
+
+Uso:  python server.py   ->  http://127.0.0.1:8765
+"""
+import json, os, threading, urllib.error, urllib.parse, urllib.request, webbrowser
+from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+STATIC = os.path.join(HERE, "static")
+DATA = os.path.join(HERE, "data.json")
+GAMEDATA = os.path.join(HERE, "gamedata.json")
+PORT = 8765
+API_HOSTS = {"west": "west", "east": "east", "europe": "europe"}
+lock = threading.Lock()
+
+
+class Handler(SimpleHTTPRequestHandler):
+    def __init__(self, *a, **kw):
+        super().__init__(*a, directory=STATIC, **kw)
+
+    def log_message(self, fmt, *args):  # silencioso, exceto erros
+        pass
+
+    def _json(self, obj, code=200):
+        body = json.dumps(obj, ensure_ascii=False).encode("utf-8")
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_GET(self):
+        url = urllib.parse.urlparse(self.path)
+        if url.path == "/api/gamedata":
+            with open(GAMEDATA, encoding="utf-8") as f:
+                return self._json(json.load(f))
+        if url.path == "/api/state":
+            with lock, open(DATA, encoding="utf-8") as f:
+                return self._json(json.load(f))
+        if url.path == "/api/prices":
+            q = urllib.parse.parse_qs(url.query)
+            host = API_HOSTS.get(q.get("server", ["west"])[0], "west")
+            items = q.get("items", [""])[0]
+            locs = q.get("locations", [""])[0]
+            api = (f"https://{host}.albion-online-data.com/api/v2/stats/prices/"
+                   f"{urllib.parse.quote(items, safe=',@_')}.json?locations={urllib.parse.quote(locs, safe=',')}&qualities=1")
+            try:
+                req = urllib.request.Request(api, headers={"User-Agent": "AlbionCraftLocal/1.0"})
+                with urllib.request.urlopen(req, timeout=30) as r:
+                    return self._json(json.loads(r.read().decode("utf-8")))
+            except urllib.error.HTTPError as e:
+                retry = e.headers.get("Retry-After") if e.headers else None
+                return self._json({"error": f"HTTP {e.code}: {e.reason}", "status": e.code,
+                                   "retryAfter": retry}, e.code if e.code in (429, 503) else 502)
+            except Exception as e:
+                return self._json({"error": str(e)}, 502)
+        return super().do_GET()
+
+    def do_POST(self):
+        if self.path == "/api/state":
+            n = int(self.headers.get("Content-Length", 0))
+            try:
+                state = json.loads(self.rfile.read(n).decode("utf-8"))
+            except ValueError:
+                return self._json({"error": "JSON invalido"}, 400)
+            with lock:
+                tmp = DATA + ".tmp"
+                with open(tmp, "w", encoding="utf-8") as f:
+                    json.dump(state, f, ensure_ascii=False)
+                os.replace(tmp, DATA)
+            return self._json({"ok": True})
+        self._json({"error": "not found"}, 404)
+
+
+if __name__ == "__main__":
+    if not os.path.exists(GAMEDATA) or not os.path.exists(DATA):
+        import build_data  # noqa: F401  (gera os arquivos)
+    srv = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
+    url = f"http://127.0.0.1:{PORT}"
+    print(f"Albion Craft rodando em {url}  (Ctrl+C para parar)")
+    if os.environ.get("NO_BROWSER") != "1":
+        threading.Timer(0.8, lambda: webbrowser.open(url)).start()
+    try:
+        srv.serve_forever()
+    except KeyboardInterrupt:
+        pass

@@ -1,0 +1,19 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Arquivos temporários e dumps pesados
+*.tmp
+_teste_copia.xlsx
+items.json
+items.txt
+~$*
+
+# Scripts de inspeção pontuais / testes
+inspect_*.py
+dump_*.py
+analyze_*.py
+extract_*.py
+test_sheet.py
+tests/
