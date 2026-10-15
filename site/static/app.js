@@ -145,7 +145,7 @@ function computeBars() {
   return bars;
 }
 
-function computeItem(bars, code, slot, k) {
+function computeBaseItem(bars, code, slot, k) {
   const c = ST.config, v = variant(code), p = piece(slot);
   const [t] = tv(k);
   const b = bars[k];
@@ -166,6 +166,63 @@ function computeItem(bars, code, slot, k) {
   };
 }
 
+function computeItem(bars, code, slot, k) {
+  const c = ST.config, v = variant(code), p = piece(slot);
+  const [t] = tv(k);
+
+  if (v && v.royal && GD.royal) {
+    const roy = GD.royal;
+    const sigilInfo = (roy.sigils && roy.sigils[t]) || null;
+    const sigilQty = (roy.sigilQty && roy.sigilQty[slot] && roy.sigilQty[slot][t]) || 0;
+    const sigilBuy = sigilInfo ? minBuy(sigilInfo.id) : null;
+    const sigilCost = (sigilBuy && sigilQty > 0) ? sigilQty * sigilBuy.price * (1 + c.taxBuy) : null;
+
+    // Peça base: Soldado (SET1), Cavaleiro (SET2) ou Guardião (SET3).
+    // Escolhe a rota mais econômica: craftar a partir de barras ou comprar pronta no mercado.
+    let bestBase = null;
+    for (const bCode of roy.baseSets) {
+      const bV = variant(bCode);
+      const bIt = computeBaseItem(bars, bCode, slot, k);
+      const bBuy = minBuy(itemId(bCode, slot, k));
+      const bBuyCost = bBuy ? bBuy.price * (1 + c.taxBuy) : null;
+
+      if (bBuyCost !== null) {
+        if (!bestBase || bBuyCost < bestBase.cost) {
+          bestBase = { code: bCode, name: `${bV.name} · ${p.name}`, method: 'buy', cost: bBuyCost, buy: bBuy, bIt };
+        }
+      }
+      if (bIt && bIt.cost !== null) {
+        if (!bestBase || bIt.cost < bestBase.cost) {
+          bestBase = { code: bCode, name: `${bV.name} · ${p.name}`, method: 'craft', cost: bIt.cost, bIt };
+        }
+      }
+    }
+
+    const baseCost = bestBase ? bestBase.cost : null;
+    const fee = 0; // Taxa de forja para conversão real é 0 prata
+    const cost = (baseCost !== null && sigilCost !== null) ? baseCost + sigilCost + fee : null;
+    const sell = bestSell(itemId(code, slot, k));
+    const revenue = sell ? sell.price * (1 - c.taxSell) : null;
+    const profit = (cost !== null && revenue !== null) ? revenue - cost : null;
+
+    return {
+      code, slot, k, t, v, p,
+      isRoyal: true,
+      sigilInfo, sigilQty, sigilBuy, sigilCost,
+      bestBase, baseCost,
+      barsCost: baseCost,
+      artCost: sigilCost,
+      art: sigilInfo ? { id: sigilInfo.id, name: `${sigilQty}x ${sigilInfo.name}` } : null,
+      artBuy: sigilBuy,
+      iv: 0, fee, cost, sell, revenue, profit,
+      margin: profit !== null && cost ? profit / cost : null,
+      name: `${v.name} · ${p.name} · T${k}`,
+    };
+  }
+
+  return computeBaseItem(bars, code, slot, k);
+}
+
 function computePlan(bars) {
   const c = ST.config;
   const rows = ST.plan.map(r => {
@@ -177,12 +234,37 @@ function computePlan(bars) {
   // Demanda direta de barras originada pelo craft de equipamentos
   const direct = Object.fromEntries(BAR_KEYS.map(k => [k, 0]));
   const arts = {};
+  const royalSigils = {};
+  const buyGearPieces = {};
+  const missing = [];
+
   for (const r of rows) {
-    direct[r.k] += r.qty * r.it.p.bars * (1 - c.retCraft);
-    if (r.it.art) {
-      const id = r.it.art.id;
-      arts[id] = arts[id] || { art: r.it.art, qty: 0, buy: r.it.artBuy };
-      arts[id].qty += r.qty;
+    if (r.it.isRoyal) {
+      if (r.it.sigilInfo) {
+        const sId = r.it.sigilInfo.id;
+        royalSigils[sId] = royalSigils[sId] || { id: sId, name: r.it.sigilInfo.name, qty: 0, buy: r.it.sigilBuy, price: r.it.sigilBuy ? r.it.sigilBuy.price * (1 + c.taxBuy) : null };
+        royalSigils[sId].qty += r.qty * r.it.sigilQty;
+        if (!r.it.sigilBuy) missing.push(r.it.sigilInfo.name);
+      }
+      if (r.it.bestBase) {
+        if (r.it.bestBase.method === 'buy') {
+          const gId = itemId(r.it.bestBase.code, r.slot, r.k);
+          buyGearPieces[gId] = buyGearPieces[gId] || { id: gId, name: r.it.bestBase.name + ' T' + r.k, qty: 0, buy: r.it.bestBase.buy, price: r.it.bestBase.cost };
+          buyGearPieces[gId].qty += r.qty;
+        } else {
+          // Craftar a peça base: repassa a demanda para as barras (com retorno de recurso no craft da peça base)
+          direct[r.k] += r.qty * r.it.p.bars * (1 - c.retCraft);
+        }
+      } else {
+        missing.push(`Peça base para ${r.it.name}`);
+      }
+    } else {
+      direct[r.k] += r.qty * r.it.p.bars * (1 - c.retCraft);
+      if (r.it.art) {
+        const id = r.it.art.id;
+        arts[id] = arts[id] || { art: r.it.art, qty: 0, buy: r.it.artBuy };
+        arts[id].qty += r.qty;
+      }
     }
   }
 
@@ -222,7 +304,7 @@ function computePlan(bars) {
     }
   }
 
-  const buyBars = [], buyOre = [], missing = [];
+  const buyBars = [], buyOre = [];
   for (const k of BAR_KEYS) {
     const q = buyBarsMap[k];
     if (q && q > 1e-9) {
@@ -258,13 +340,23 @@ function computePlan(bars) {
   }));
   artList.filter(a => a.price === null).forEach(a => missing.push(a.art.name));
 
+  const sigilsList = Object.values(royalSigils).map(s => ({
+    ...s,
+    total: s.price ? s.qty * s.price : null
+  }));
+
+  const baseGearList = Object.values(buyGearPieces).map(g => ({
+    ...g,
+    total: g.price ? g.qty * g.price : null
+  }));
+
   const sum = arr => arr.reduce((s, x) => s + (x.total || 0), 0);
   const fees = rows.reduce((s, r) => s + r.it.fee * r.qty, 0)
     + Object.entries(refineStats).reduce((s, [k, q]) => s + (q * bars[k].fee), 0);
 
   return {
-    rows, buyBars, buyOre, artList, missing, total: barDemands,
-    invest: sum(buyBars) + sum(buyOre) + sum(artList), fees,
+    rows, buyBars, buyOre, artList, sigilsList, baseGearList, missing, total: barDemands,
+    invest: sum(buyBars) + sum(buyOre) + sum(artList) + sum(sigilsList) + sum(baseGearList), fees,
     cost: rows.reduce((s, r) => s + (r.totalCost || 0), 0),
     revenue: rows.reduce((s, r) => s + (r.it.revenue !== null ? r.it.revenue * r.qty : 0), 0),
     profit: rows.reduce((s, r) => s + (r.totalProfit || 0), 0),
@@ -297,7 +389,7 @@ function render() {
 }
 
 const opt = (val, label, sel) => `<option value="${esc(val)}"${String(val) === String(sel) ? ' selected' : ''}>${esc(label)}</option>`;
-const variantOpts = sel => GD.variants.map(v => opt(v.code, v.name + (v.artifact ? ' ★' : ''), sel)).join('');
+const variantOpts = sel => GD.variants.map(v => opt(v.code, v.name + (v.royal ? ' 👑' : v.artifact ? ' ★' : ''), sel)).join('');
 const pieceOpts = sel => GD.pieces.map(p => opt(p.slot, p.name, sel)).join('');
 const tierOpts = sel => TIERS.map(k => opt(k, 'T' + k, sel)).join('');
 
@@ -311,8 +403,8 @@ function viewPlan() {
       <td class="l"><select data-plan="${i}" data-f="slot">${pieceOpts(r.slot)}</select></td>
       <td class="l"><select data-plan="${i}" data-f="k">${tierOpts(r.k)}</select></td>
       <td><input class="num" type="number" min="0" data-plan="${i}" data-f="qty" data-fk="plan-${i}" value="${r.qty}"></td>
-      <td>${fmt(r.it.barsCost)}</td>
-      <td>${r.it.art ? fmt(r.it.artCost) : '<span class="muted">—</span>'}</td>
+      <td>${r.it.isRoyal ? (r.it.bestBase ? `<span title="Base: ${esc(r.it.bestBase.name)} (${r.it.bestBase.method === 'craft' ? 'craftar com barras' : 'comprar pronta'})">${fmt(r.it.barsCost)}</span>` : '<span class="neg">sem base</span>') : fmt(r.it.barsCost)}</td>
+      <td class="l muted">${r.it.isRoyal ? (r.it.sigilInfo ? `<span title="${r.it.sigilQty * r.qty}x ${esc(r.it.sigilInfo.name)}">👑 ${fmt(r.it.artCost)}</span>` : '—') : (r.it.art ? `<span title="${esc(r.it.art.name)}">${fmt(r.it.artCost)}</span>` : '—')}</td>
       <td>${fmt(r.it.fee)}</td>
       <td><b>${fmt(r.it.cost)}</b></td>
       <td class="best">${r.it.sell ? fmt(r.it.sell.price) : '<span class="muted">sem preço</span>'}</td>
@@ -338,7 +430,7 @@ function viewPlan() {
   </div>
   ${P.missing.length ? `<div class="card" style="border-color:#6b5a2a">⚠️ Faltam preços para: <b>${esc([...new Set(P.missing)].join(', '))}</b> — preencha na aba Preços ou use “Buscar preços”.</div>` : ''}
   <div class="tablewrap"><table>
-    <tr><th class="l">Variante</th><th class="l">Peça</th><th class="l">Tier</th><th>Qtd</th><th>Barras (líq.)</th><th>Artefato</th><th>Taxa ferreiro</th>
+    <tr><th class="l">Variante</th><th class="l">Peça</th><th class="l">Tier</th><th>Qtd</th><th>Barras / Base</th><th>Artefato / Emblema</th><th>Taxa ferreiro</th>
     <th>Custo / peça</th><th>Melhor venda</th><th class="l">Local</th><th>Lucro / peça</th><th>Margem</th><th>Lucro total</th><th></th></tr>
     ${rows || '<tr><td colspan="14" class="empty">Nenhum item planejado. Clique em “Adicionar item” ou use o Ranking.</td></tr>'}
   </table></div>
@@ -349,6 +441,8 @@ function viewPlan() {
     ${list('Minério (para refinar)', P.buyOre, [['Minério', x => 'T' + x.k, 'l'], ['Qtd', x => fmt(Math.ceil(x.qty))], ['Cidade', x => x.loc, 'l'], ['Preço', x => fmt(x.price)], ['Total', x => fmt(x.total)], ['Barras a refinar', x => fmt(Math.ceil(x.refineQty))]])}
     ${list('Barras prontas', P.buyBars, [['Barra', x => 'T' + x.k, 'l'], ['Qtd', x => fmt(Math.ceil(x.qty))], ['Cidade', x => x.loc || '', 'l'], ['Preço', x => fmt(x.price)], ['Total', x => fmt(x.total)]])}
     ${list('Artefatos', P.artList, [['Artefato', x => esc(x.art.name) + ` <span class="muted">T${x.art.id[1]}</span>`, 'l'], ['Qtd', x => fmt(x.qty)], ['Cidade', x => x.buy ? x.buy.loc : '<span class="neg">sem preço</span>', 'l'], ['Preço', x => fmt(x.price)], ['Total', x => fmt(x.total)]])}
+    ${P.sigilsList && P.sigilsList.length ? list('Emblemas Reais', P.sigilsList, [['Emblema', x => esc(x.name), 'l'], ['Qtd', x => fmt(x.qty)], ['Cidade', x => x.buy ? x.buy.loc : '<span class="neg">sem preço</span>', 'l'], ['Preço', x => fmt(x.price)], ['Total', x => fmt(x.total)]]) : ''}
+    ${P.baseGearList && P.baseGearList.length ? list('Peças Base (comprar prontas)', P.baseGearList, [['Peça', x => esc(x.name), 'l'], ['Qtd', x => fmt(x.qty)], ['Cidade', x => x.buy ? x.buy.loc : '<span class="neg">sem preço</span>', 'l'], ['Preço', x => fmt(x.price)], ['Total', x => fmt(x.total)]]) : ''}
   </div>
   <div class="muted">Quantidades arredondadas para cima. As barras T2/T3 usadas como base do refino entram automaticamente na cadeia.</div>`;
 }
@@ -489,12 +583,18 @@ function priceTable(rows, locs, extraHead = '', extra = () => '') {
     }).join('')}</table></div>`;
 }
 function viewPrices() {
-  const tabs = [['ore', 'Minério'], ['bar', 'Barras'], ['art', 'Artefatos'], ['gear', 'Equipamentos (venda)']];
+  const tabs = [['ore', 'Minério'], ['bar', 'Barras'], ['art', 'Artefatos & Emblemas'], ['gear', 'Equipamentos (venda)']];
   let content = '';
   if (priceTab === 'ore') content = priceTable(BAR_KEYS.map(k => ({ id: oreId(k), label: `Minério T${k}` })), GD.cities);
   if (priceTab === 'bar') content = priceTable(BAR_KEYS.map(k => ({ id: barId(k), label: `Barra T${k}` })), GD.cities);
   if (priceTab === 'art') {
     const rows = [];
+    if (GD.royal) {
+      for (const t of [4, 5, 6, 7, 8]) {
+        const s = GD.royal.sigils[t];
+        if (s) rows.push({ id: s.id, label: `👑 ${esc(s.name)} <span class="muted">T${t} · Emblema Real</span>` });
+      }
+    }
     for (const v of GD.variants) if (v.artifact) for (const p of GD.pieces) for (let t = 4; t <= 8; t++) {
       const a = artOf(v.code, p.slot, t); rows.push({ id: a.id, label: `${esc(a.name)} <span class="muted">T${t} · ${esc(v.name)} ${p.name}</span>` });
     }
@@ -559,13 +659,18 @@ function allIds() {
   const ids = new Set();
   BAR_KEYS.forEach(k => { ids.add(oreId(k)); ids.add(barId(k)); });
   Object.values(GD.artifacts).forEach(a => ids.add(a.id));
+  if (GD.royal) Object.values(GD.royal.sigils).forEach(s => ids.add(s.id));
   for (const v of GD.variants) for (const p of GD.pieces) for (const k of TIERS) ids.add(itemId(v.code, p.slot, k));
   return [...ids];
 }
 function tabIds() {
   if (priceTab === 'ore') return BAR_KEYS.map(oreId);
   if (priceTab === 'bar') return BAR_KEYS.map(barId);
-  if (priceTab === 'art') return Object.values(GD.artifacts).map(a => a.id);
+  if (priceTab === 'art') {
+    const list = Object.values(GD.artifacts).map(a => a.id);
+    if (GD.royal) list.push(...Object.values(GD.royal.sigils).map(s => s.id));
+    return list;
+  }
   const g = gearFilter, ids = [];
   for (const p of GD.pieces) if (!g.piece || g.piece === p.slot) for (const k of TIERS) if (tv(k)[0] >= Number(g.tmin)) ids.push(itemId(g.variant, p.slot, k));
   return ids;
@@ -575,8 +680,15 @@ function planIds() {
   for (const r of ST.plan) {
     ids.add(itemId(r.code, r.slot, r.k));
     const [t] = tv(r.k);
-    const a = variant(r.code).artifact ? artOf(r.code, r.slot, t) : null;
-    if (a) ids.add(a.id);
+    const v = variant(r.code);
+    if (v && v.royal && GD.royal) {
+      const sig = GD.royal.sigils[t];
+      if (sig) ids.add(sig.id);
+      for (const bCode of GD.royal.baseSets) ids.add(itemId(bCode, r.slot, r.k));
+    } else {
+      const a = (v && v.artifact) ? artOf(r.code, r.slot, t) : null;
+      if (a) ids.add(a.id);
+    }
     let k = r.k;
     while (k) { ids.add(barId(k)); ids.add(oreId(k)); k = lowerBar(k); }
   }

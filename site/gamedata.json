@@ -19,42 +19,56 @@
   {
    "code": "SET1",
    "name": "Soldado (Soldier)",
-   "artifact": false
+   "artifact": false,
+   "royal": false
   },
   {
    "code": "SET2",
    "name": "Cavaleiro (Knight)",
-   "artifact": false
+   "artifact": false,
+   "royal": false
   },
   {
    "code": "SET3",
    "name": "Guardião (Guardian)",
-   "artifact": false
+   "artifact": false,
+   "royal": false
   },
   {
    "code": "UNDEAD",
    "name": "Graveguard",
-   "artifact": true
+   "artifact": true,
+   "royal": false
   },
   {
    "code": "HELL",
    "name": "Demônio (Demon)",
-   "artifact": true
+   "artifact": true,
+   "royal": false
   },
   {
    "code": "KEEPER",
    "name": "Juiz (Judicator)",
-   "artifact": true
+   "artifact": true,
+   "royal": false
   },
   {
    "code": "FEY",
    "name": "Duskweaver",
-   "artifact": true
+   "artifact": true,
+   "royal": false
   },
   {
    "code": "AVALON",
    "name": "Valor",
-   "artifact": true
+   "artifact": true,
+   "royal": false
+  },
+  {
+   "code": "ROYAL",
+   "name": "Real (Royal)",
+   "artifact": false,
+   "royal": true
   }
  ],
  "pieces": [
@@ -451,6 +465,63 @@
    "iv": 7680
   }
  },
+ "royal": {
+  "sigils": {
+   "4": {
+    "id": "QUESTITEM_TOKEN_ROYAL_T4",
+    "name": "Emblema Real do Adepto (T4)",
+    "tier": 4
+   },
+   "5": {
+    "id": "QUESTITEM_TOKEN_ROYAL_T5",
+    "name": "Emblema Real do Perito (T5)",
+    "tier": 5
+   },
+   "6": {
+    "id": "QUESTITEM_TOKEN_ROYAL_T6",
+    "name": "Emblema Real do Mestre (T6)",
+    "tier": 6
+   },
+   "7": {
+    "id": "QUESTITEM_TOKEN_ROYAL_T7",
+    "name": "Emblema Real do Grão-Mestre (T7)",
+    "tier": 7
+   },
+   "8": {
+    "id": "QUESTITEM_TOKEN_ROYAL_T8",
+    "name": "Emblema Real do Ancião (T8)",
+    "tier": 8
+   }
+  },
+  "sigilQty": {
+   "HEAD": {
+    "4": 2,
+    "5": 4,
+    "6": 8,
+    "7": 8,
+    "8": 8
+   },
+   "ARMOR": {
+    "4": 4,
+    "5": 8,
+    "6": 16,
+    "7": 16,
+    "8": 16
+   },
+   "SHOES": {
+    "4": 2,
+    "5": 4,
+    "6": 8,
+    "7": 8,
+    "8": 8
+   }
+  },
+  "baseSets": [
+   "SET1",
+   "SET2",
+   "SET3"
+  ]
+ },
  "itemNames": {
   "T4_ARMOR_PLATE_SET1": "Adept's Soldier Armor",
   "T5_ARMOR_PLATE_SET1": "Expert's Soldier Armor",
@@ -571,6 +642,86 @@
   "T5_SHOES_PLATE_AVALON": "Expert's Boots of Valor",
   "T6_SHOES_PLATE_AVALON": "Master's Boots of Valor",
   "T7_SHOES_PLATE_AVALON": "Grandmaster's Boots of Valor",
-  "T8_SHOES_PLATE_AVALON": "Elder's Boots of Valor"
+  "T8_SHOES_PLATE_AVALON": "Elder's Boots of Valor",
+  "T4_ARMOR_PLATE_ROYAL": "Adept's Royal Armor",
+  "T4_ARMOR_PLATE_ROYAL@1": "Adept's Royal Armor",
+  "T4_ARMOR_PLATE_ROYAL@2": "Adept's Royal Armor",
+  "T4_ARMOR_PLATE_ROYAL@3": "Adept's Royal Armor",
+  "T4_ARMOR_PLATE_ROYAL@4": "Adept's Royal Armor",
+  "T5_ARMOR_PLATE_ROYAL": "Expert's Royal Armor",
+  "T5_ARMOR_PLATE_ROYAL@1": "Expert's Royal Armor",
+  "T5_ARMOR_PLATE_ROYAL@2": "Expert's Royal Armor",
+  "T5_ARMOR_PLATE_ROYAL@3": "Expert's Royal Armor",
+  "T5_ARMOR_PLATE_ROYAL@4": "Expert's Royal Armor",
+  "T6_ARMOR_PLATE_ROYAL": "Master's Royal Armor",
+  "T6_ARMOR_PLATE_ROYAL@1": "Master's Royal Armor",
+  "T6_ARMOR_PLATE_ROYAL@2": "Master's Royal Armor",
+  "T6_ARMOR_PLATE_ROYAL@3": "Master's Royal Armor",
+  "T6_ARMOR_PLATE_ROYAL@4": "Master's Royal Armor",
+  "T7_ARMOR_PLATE_ROYAL": "Grandmaster's Royal Armor",
+  "T7_ARMOR_PLATE_ROYAL@1": "Grandmaster's Royal Armor",
+  "T7_ARMOR_PLATE_ROYAL@2": "Grandmaster's Royal Armor",
+  "T7_ARMOR_PLATE_ROYAL@3": "Grandmaster's Royal Armor",
+  "T7_ARMOR_PLATE_ROYAL@4": "Grandmaster's Royal Armor",
+  "T8_ARMOR_PLATE_ROYAL": "Elder's Royal Armor",
+  "T8_ARMOR_PLATE_ROYAL@1": "Elder's Royal Armor",
+  "T8_ARMOR_PLATE_ROYAL@2": "Elder's Royal Armor",
+  "T8_ARMOR_PLATE_ROYAL@3": "Elder's Royal Armor",
+  "T8_ARMOR_PLATE_ROYAL@4": "Elder's Royal Armor",
+  "T4_HEAD_PLATE_ROYAL": "Adept's Royal Helmet",
+  "T4_HEAD_PLATE_ROYAL@1": "Adept's Royal Helmet",
+  "T4_HEAD_PLATE_ROYAL@2": "Adept's Royal Helmet",
+  "T4_HEAD_PLATE_ROYAL@3": "Adept's Royal Helmet",
+  "T4_HEAD_PLATE_ROYAL@4": "Adept's Royal Helmet",
+  "T5_HEAD_PLATE_ROYAL": "Expert's Royal Helmet",
+  "T5_HEAD_PLATE_ROYAL@1": "Expert's Royal Helmet",
+  "T5_HEAD_PLATE_ROYAL@2": "Expert's Royal Helmet",
+  "T5_HEAD_PLATE_ROYAL@3": "Expert's Royal Helmet",
+  "T5_HEAD_PLATE_ROYAL@4": "Expert's Royal Helmet",
+  "T6_HEAD_PLATE_ROYAL": "Master's Royal Helmet",
+  "T6_HEAD_PLATE_ROYAL@1": "Master's Royal Helmet",
+  "T6_HEAD_PLATE_ROYAL@2": "Master's Royal Helmet",
+  "T6_HEAD_PLATE_ROYAL@3": "Master's Royal Helmet",
+  "T6_HEAD_PLATE_ROYAL@4": "Master's Royal Helmet",
+  "T7_HEAD_PLATE_ROYAL": "Grandmaster's Royal Helmet",
+  "T7_HEAD_PLATE_ROYAL@1": "Grandmaster's Royal Helmet",
+  "T7_HEAD_PLATE_ROYAL@2": "Grandmaster's Royal Helmet",
+  "T7_HEAD_PLATE_ROYAL@3": "Grandmaster's Royal Helmet",
+  "T7_HEAD_PLATE_ROYAL@4": "Grandmaster's Royal Helmet",
+  "T8_HEAD_PLATE_ROYAL": "Elder's Royal Helmet",
+  "T8_HEAD_PLATE_ROYAL@1": "Elder's Royal Helmet",
+  "T8_HEAD_PLATE_ROYAL@2": "Elder's Royal Helmet",
+  "T8_HEAD_PLATE_ROYAL@3": "Elder's Royal Helmet",
+  "T8_HEAD_PLATE_ROYAL@4": "Elder's Royal Helmet",
+  "T4_SHOES_PLATE_ROYAL": "Adept's Royal Boots",
+  "T4_SHOES_PLATE_ROYAL@1": "Adept's Royal Boots",
+  "T4_SHOES_PLATE_ROYAL@2": "Adept's Royal Boots",
+  "T4_SHOES_PLATE_ROYAL@3": "Adept's Royal Boots",
+  "T4_SHOES_PLATE_ROYAL@4": "Adept's Royal Boots",
+  "T5_SHOES_PLATE_ROYAL": "Expert's Royal Boots",
+  "T5_SHOES_PLATE_ROYAL@1": "Expert's Royal Boots",
+  "T5_SHOES_PLATE_ROYAL@2": "Expert's Royal Boots",
+  "T5_SHOES_PLATE_ROYAL@3": "Expert's Royal Boots",
+  "T5_SHOES_PLATE_ROYAL@4": "Expert's Royal Boots",
+  "T6_SHOES_PLATE_ROYAL": "Master's Royal Boots",
+  "T6_SHOES_PLATE_ROYAL@1": "Master's Royal Boots",
+  "T6_SHOES_PLATE_ROYAL@2": "Master's Royal Boots",
+  "T6_SHOES_PLATE_ROYAL@3": "Master's Royal Boots",
+  "T6_SHOES_PLATE_ROYAL@4": "Master's Royal Boots",
+  "T7_SHOES_PLATE_ROYAL": "Grandmaster's Royal Boots",
+  "T7_SHOES_PLATE_ROYAL@1": "Grandmaster's Royal Boots",
+  "T7_SHOES_PLATE_ROYAL@2": "Grandmaster's Royal Boots",
+  "T7_SHOES_PLATE_ROYAL@3": "Grandmaster's Royal Boots",
+  "T7_SHOES_PLATE_ROYAL@4": "Grandmaster's Royal Boots",
+  "T8_SHOES_PLATE_ROYAL": "Elder's Royal Boots",
+  "T8_SHOES_PLATE_ROYAL@1": "Elder's Royal Boots",
+  "T8_SHOES_PLATE_ROYAL@2": "Elder's Royal Boots",
+  "T8_SHOES_PLATE_ROYAL@3": "Elder's Royal Boots",
+  "T8_SHOES_PLATE_ROYAL@4": "Elder's Royal Boots",
+  "QUESTITEM_TOKEN_ROYAL_T4": "Adept's Royal Sigil",
+  "QUESTITEM_TOKEN_ROYAL_T5": "Expert's Royal Sigil",
+  "QUESTITEM_TOKEN_ROYAL_T6": "Master's Royal Sigil",
+  "QUESTITEM_TOKEN_ROYAL_T7": "Grandmaster's Royal Sigil",
+  "QUESTITEM_TOKEN_ROYAL_T8": "Elder's Royal Sigil"
  }
 }
