@@ -2,8 +2,9 @@
 
 Uso:  python server.py   ->  http://127.0.0.1:8765
 """
+from datetime import datetime
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 import json, os, threading, urllib.error, urllib.parse, urllib.request, webbrowser
-from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 STATIC = os.path.join(HERE, "static")
@@ -12,6 +13,44 @@ GAMEDATA = os.path.join(HERE, "gamedata.json")
 PORT = 8765
 API_HOSTS = {"west": "west", "east": "east", "europe": "europe"}
 lock = threading.Lock()
+
+LOCATIONS = {
+    4: "Swamp Cross",
+    7: "Thetford",
+    301: "Thetford",
+    1002: "Lymhurst",
+    1301: "Lymhurst",
+    2004: "Bridgewatch",
+    2301: "Bridgewatch",
+    3008: "Martlock",
+    3301: "Martlock",
+    4002: "Fort Sterling",
+    4301: "Fort Sterling",
+    3005: "Caerleon",
+    3013: "Caerleon",
+    3003: "Black Market",
+    5003: "Brecilien"
+}
+
+def resolve_location(loc_raw):
+    if not loc_raw:
+        return None
+    s = str(loc_raw).strip()
+    if "Auction2" in s or "BlackMarket" in s or s == "3003":
+        return "Black Market"
+    digits = "".join(filter(str.isdigit, s))
+    if digits:
+        return LOCATIONS.get(int(digits))
+    return None
+
+live_status = {
+    "connected": False,
+    "last_heartbeat": None,
+    "last_update": None,
+    "last_city": None,
+    "items_updated": 0,
+    "total_received": 0
+}
 
 
 class Handler(SimpleHTTPRequestHandler):
@@ -38,6 +77,18 @@ class Handler(SimpleHTTPRequestHandler):
         if url.path == "/api/state":
             with lock, open(DATA, encoding="utf-8") as f:
                 return self._json(json.load(f))
+        if url.path == "/api/live_status":
+            with lock:
+                now = datetime.now()
+                is_conn = False
+                if live_status["last_heartbeat"]:
+                    diff = (now - live_status["last_heartbeat"]).total_seconds()
+                    is_conn = diff < 60
+                res = dict(live_status)
+                res["connected"] = is_conn
+                res["last_heartbeat"] = live_status["last_heartbeat"].isoformat() if live_status["last_heartbeat"] else None
+                res["last_update"] = live_status["last_update"].isoformat() if live_status["last_update"] else None
+                return self._json(res)
         if url.path == "/api/prices":
             q = urllib.parse.parse_qs(url.query)
             host = API_HOSTS.get(q.get("server", ["west"])[0], "west")
@@ -58,7 +109,8 @@ class Handler(SimpleHTTPRequestHandler):
         return super().do_GET()
 
     def do_POST(self):
-        if self.path == "/api/state":
+        url = urllib.parse.urlparse(self.path)
+        if url.path == "/api/state":
             n = int(self.headers.get("Content-Length", 0))
             try:
                 state = json.loads(self.rfile.read(n).decode("utf-8"))
@@ -70,6 +122,80 @@ class Handler(SimpleHTTPRequestHandler):
                     json.dump(state, f, ensure_ascii=False)
                 os.replace(tmp, DATA)
             return self._json({"ok": True})
+
+        if url.path.startswith("/api/ingest") or "/marketorders" in url.path:
+            n = int(self.headers.get("Content-Length", 0))
+            try:
+                payload = json.loads(self.rfile.read(n).decode("utf-8"))
+            except Exception as e:
+                return self._json({"error": f"JSON invalido: {e}"}, 400)
+
+            orders = payload.get("Orders", [])
+            now_dt = datetime.now()
+            now_iso = now_dt.isoformat()
+
+            batch_offers = {}
+            batch_requests = {}
+            last_city = None
+
+            for order in orders:
+                city = resolve_location(order.get("LocationId"))
+                if not city:
+                    continue
+                item_id = order.get("ItemTypeId")
+                if not item_id:
+                    continue
+                price = (order.get("UnitPriceSilver") or 0) / 10000.0
+                if price <= 0:
+                    continue
+                quality = order.get("QualityLevel", 1)
+                if quality != 1:
+                    continue
+                auction_type = order.get("AuctionType", "")
+                key = (item_id, city)
+                last_city = city
+                if auction_type == "offer":
+                    if key not in batch_offers or price < batch_offers[key]:
+                        batch_offers[key] = price
+                elif auction_type == "request":
+                    if key not in batch_requests or price > batch_requests[key]:
+                        batch_requests[key] = price
+
+            updated_count = 0
+            with lock:
+                with open(DATA, encoding="utf-8") as f:
+                    state = json.load(f)
+                state.setdefault("prices", {})
+                state.setdefault("dates", {})
+
+                for (item_id, city), p in batch_offers.items():
+                    if city != "Black Market":
+                        state["prices"].setdefault(item_id, {})[city] = p
+                        state["dates"].setdefault(item_id, {})[city] = now_iso
+                        updated_count += 1
+
+                for (item_id, city), p in batch_requests.items():
+                    if city == "Black Market":
+                        state["prices"].setdefault(item_id, {})[city] = p
+                        state["dates"].setdefault(item_id, {})[city] = now_iso
+                        updated_count += 1
+
+                if updated_count > 0:
+                    tmp = DATA + ".tmp"
+                    with open(tmp, "w", encoding="utf-8") as f:
+                        json.dump(state, f, ensure_ascii=False)
+                    os.replace(tmp, DATA)
+
+                    live_status["last_update"] = now_dt
+                    live_status["last_city"] = last_city
+                    live_status["items_updated"] = updated_count
+                    live_status["total_received"] += len(orders)
+
+                live_status["connected"] = True
+                live_status["last_heartbeat"] = now_dt
+
+            return self._json({"ok": True, "updated": updated_count, "city": last_city})
+
         self._json({"error": "not found"}, 404)
 
 

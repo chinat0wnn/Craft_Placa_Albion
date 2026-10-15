@@ -17,3 +17,7 @@ analyze_*.py
 extract_*.py
 test_sheet.py
 tests/
+
+# Albion Data Client logs and binary
+albiondata-client.log*
+albiondata-client.exe

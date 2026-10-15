@@ -690,10 +690,70 @@ function bind() {
   });
 }
 
+/* ---------------- leitor em tempo real ---------------- */
+let lastSeenLiveUpdate = null;
+let livePollTimer = null;
+
+async function checkLiveStatus() {
+  const badge = $('#liveBadge');
+  const text = $('#liveText');
+  if (!badge || !text) return;
+
+  try {
+    const res = await fetch('/api/live_status');
+    if (!res.ok) throw new Error('Status HTTP ' + res.status);
+    const data = await res.json();
+
+    badge.classList.remove('waiting', 'connected', 'active');
+
+    if (data.connected) {
+      const city = data.last_city ? locName(data.last_city) : '';
+
+      if (data.last_update && data.last_update !== lastSeenLiveUpdate) {
+        if (lastSeenLiveUpdate !== null) {
+          const fresh = await fetch('/api/state').then(r => r.json());
+          ST.prices = fresh.prices || {};
+          ST.dates = fresh.dates || {};
+          render();
+          toast(`🟢 Mercado lido em tempo real: ${data.items_updated} preço(s) em ${city || 'mercado'}.`);
+        }
+        lastSeenLiveUpdate = data.last_update;
+      }
+
+      let isRecent = false;
+      if (data.last_update) {
+        const diffMs = Date.now() - new Date(data.last_update).getTime();
+        if (diffMs < 20000) isRecent = true;
+      }
+
+      if (isRecent && city) {
+        badge.classList.add('active');
+        text.textContent = `Ao vivo: ${city} (${data.items_updated})`;
+        badge.title = `Leitor ativo! Última leitura: ${city} (${data.total_received} ordens recebidas no total).`;
+      } else {
+        badge.classList.add('connected');
+        text.textContent = `Leitor conectado${city ? ' (' + city + ')' : ''}`;
+        badge.title = 'Leitor de pacotes conectado. Abra o mercado no Albion para capturar preços.';
+      }
+    } else {
+      badge.classList.add('waiting');
+      text.textContent = 'Leitor: Desconectado';
+      badge.title = 'Inicie o leitor com Iniciar_Com_Leitor.bat para ler preços do jogo automaticamente.';
+    }
+  } catch {
+    badge.classList.remove('connected', 'active');
+    badge.classList.add('waiting');
+    text.textContent = 'Leitor: Offline';
+    badge.title = 'Não foi possível conectar ao servidor local.';
+  }
+}
+
 (async function init() {
   [GD, ST] = await Promise.all([fetch('/api/gamedata').then(r => r.json()), fetch('/api/state').then(r => r.json())]);
   ST.prices ??= {}; ST.dates ??= {}; ST.origins ??= {}; ST.plan ??= [];
   ST.config = { taxBuy: 0, taxSell: 0.065, retRefine: 0.367, retCraft: 0.248, feeRefine: 465, feeCraft: 465, server: 'west', ...ST.config };
   bind();
   render();
+  checkLiveStatus();
+  livePollTimer = setInterval(checkLiveStatus, 2500);
 })();

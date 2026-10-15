@@ -24,16 +24,21 @@ Sistema integrado de **Refino de Minérios** e **Craft de Equipamentos de Placas
    - Preços de compra comparados nas 5 cidades reais (*Thetford, Martlock, Bridgewatch, Lymhurst, Fort Sterling*).
    - Preços de venda comparados nas 5 cidades, **Caerleon** e **Mercado Negro (Black Market)**.
 
-4. **Busca Automática de Preços:**
+4. **Leitor de Mercado em Tempo Real (In-Game Packet Capture):**
+   - Captura preços **automaticamente e em tempo real** diretamente do jogo conforme você visita os mercados das cidades e do Mercado Negro.
+   - **100% Seguro e em Conformidade com as Regras (TOS) da Sandbox Interactive:** Funciona por monitoramento passivo de pacotes de rede locais (via driver Npcap), **sem injetar código nem tocar na memória do cliente do jogo**.
+   - Integração direta: alimenta o servidor local em `/api/ingest`, atualizando as tabelas e o ranking de lucro no navegador instantaneamente com alertas visuais.
+
+5. **Busca Automática via API Pública:**
    - Integração com a API pública do **Albion Online Data Project** (servidores *Américas / West*, *Europa* e *Ásia / East*).
    - Envio em lotes otimizados com pausa automática (*throttle*) e tratamento com retentativa inteligente para evitar erros de limite de requisições (`HTTP 429`).
    - Indicação visual de preços desatualizados (> 48h) e suporte a edição manual de qualquer valor.
 
-5. **Planejador & Lista de Compras:**
+6. **Planejador & Lista de Compras:**
    - Permite montar uma lista do que você deseja craftar e informa o custo total, receita esperada e lucro líquido.
    - Gera uma **Lista de Compras Consolidada** (minérios, barras prontas e artefatos necessários já descontando os retornos de recursos esperados), indicando em qual cidade comprar cada item pelo menor preço.
 
-6. **Versão Planilha Excel:**
+7. **Versão Planilha Excel:**
    - Acompanha o arquivo `Planilha_Craft_Placas.xlsx` com fórmulas matemáticas idênticas e validadas diretamente no Excel.
 
 ---
@@ -42,20 +47,33 @@ Sistema integrado de **Refino de Minérios** e **Craft de Equipamentos de Placas
 
 ### Pré-requisitos
 - **Python 3.8+** instalado no seu computador.
-  > O servidor web utiliza apenas a biblioteca padrão do Python (`http.server`, `urllib`, `json`), portanto **não é necessário instalar nenhuma biblioteca externa via pip** para rodar o site!
+  > O servidor web utiliza apenas a biblioteca padrão do Python (`http.server`, `urllib`, `json`), portanto **não é necessário instalar bibliotecas externas via pip**.
+- *(Opcional, para o leitor em tempo real)* **Driver Npcap**:
+  > Se for usar o leitor passivo de pacotes, instale o Npcap gratuito em [npcap.com](https://npcap.com/#download) marcando a opção *"Install Npcap in WinPcap API-compatible Mode"*.
 
 ---
 
-### Opção 1: Execução Rápida (Windows)
+### Opção 1: Com Leitor de Mercado em Tempo Real (Recomendado)
+Dê um duplo clique no arquivo:
+```
+Iniciar_Com_Leitor.bat
+```
+- Inicia o servidor web do Albion Craft em segundo plano.
+- Inicia o leitor de pacotes passivo (`albiondata-client`).
+- Conforme você abre o mercado no Albion Online (Thetford, Fort Sterling, Caerleon, Mercado Negro, etc.), as ordens são capturadas e o site é atualizado na hora com uma notificação verde e status "Ao vivo".
+
+---
+
+### Opção 2: Somente o Site Local (Sem Leitor de Pacotes)
 Dê um duplo clique no arquivo:
 ```
 Iniciar_Site.bat
 ```
-O servidor será iniciado e a página abrirá automaticamente no seu navegador padrão em `http://127.0.0.1:8765`.
+O servidor será iniciado e a página abrirá em `http://127.0.0.1:8765`. Você poderá consultar a API pública ou preencher os preços manualmente.
 
 ---
 
-### Opção 2: Pelo Terminal / Linha de Comando
+### Opção 3: Pelo Terminal / Linha de Comando
 
 1. Abra o terminal (PowerShell, CMD ou Bash) na pasta do projeto:
    ```bash
@@ -107,17 +125,18 @@ Para encerrar o servidor, pressione `Ctrl + C` no terminal.
 
 ```
 Planilhas_Albion/
-├── Iniciar_Site.bat               # Atalho para inicialização rápida no Windows
+├── Iniciar_Com_Leitor.bat         # Inicialização completa (Site + Leitor em tempo real)
+├── Iniciar_Site.bat               # Atalho para inicialização simples (somente o site)
 ├── Planilha_Craft_Placas.xlsx     # Planilha Excel completa e automatizada
 ├── site/                          # Código da aplicação web
-│   ├── server.py                  # Servidor HTTP local em Python puro + Proxy da API
+│   ├── server.py                  # Servidor HTTP local (endpoints /api/ingest e /api/live_status)
 │   ├── build_data.py              # Extrator de receitas oficiais do jogo
 │   ├── gamedata.json              # Base de itens, receitas e valores de item
 │   ├── data.json                  # Estado do usuário (preços salvos, configs, planos)
 │   └── static/                    # Frontend da aplicação
-│       ├── index.html             # Estrutura HTML
+│       ├── index.html             # Estrutura HTML com badge de status ao vivo
 │       ├── style.css              # Tema escuro e responsivo
-│       └── app.js                 # Lógica de cálculo, tabelas e integração com API
+│       └── app.js                 # Lógica de cálculo, tabelas, polling ao vivo e API
 └── README.md                      # Esta documentação
 ```
 

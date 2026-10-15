@@ -57,3 +57,12 @@ button.icon:hover{color:var(--red)}
 .cfg td{text-align:left}
 .cfg td:first-child{width:320px}
 .empty{color:var(--muted);padding:20px;text-align:center}
+.live-badge{display:inline-flex;align-items:center;gap:8px;padding:5px 12px;border-radius:20px;background:var(--panel2);border:1px solid var(--line);font-size:12px;color:var(--muted);user-select:none;white-space:nowrap;transition:all .3s ease}
+.live-dot{width:8px;height:8px;border-radius:50%;background:var(--muted);display:inline-block;transition:background-color .3s,box-shadow .3s}
+.live-badge.waiting{border-color:var(--line);color:var(--muted)}
+.live-badge.waiting .live-dot{background:var(--muted)}
+.live-badge.connected{border-color:rgba(90,169,255,.4);color:var(--blue)}
+.live-badge.connected .live-dot{background:var(--blue);box-shadow:0 0 6px rgba(90,169,255,.7);animation:live-pulse 2s infinite ease-in-out}
+.live-badge.active{border-color:rgba(76,195,138,.5);color:var(--green)}
+.live-badge.active .live-dot{background:var(--green);box-shadow:0 0 8px rgba(76,195,138,.9);animation:live-pulse 1s infinite ease-in-out}
+@keyframes live-pulse{0%,100%{opacity:.4;transform:scale(.9)}50%{opacity:1;transform:scale(1.15)}}
