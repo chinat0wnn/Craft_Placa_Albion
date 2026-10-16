@@ -4,7 +4,7 @@ import json, os, re
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 
-VARIANTS = [
+PLATE_VARIANTS = [
     ("SET1", "Soldado (Soldier)", False, False),
     ("SET2", "Cavaleiro (Knight)", False, False),
     ("SET3", "Guardião (Guardian)", False, False),
@@ -15,7 +15,34 @@ VARIANTS = [
     ("AVALON", "Valor", True, False),
     ("ROYAL", "Real (Royal)", False, True),
 ]
-PIECES = [("ARMOR", "Armadura", 16), ("HEAD", "Elmo", 8), ("SHOES", "Botas", 8)]
+
+BOW_VARIANTS = [
+    ("2H_BOW", "Arco (Bow)", False, 0, 32),
+    ("2H_WARBOW", "Arco de Guerra (Warbow)", False, 0, 32),
+    ("2H_LONGBOW", "Arco Longo (Longbow)", False, 0, 32),
+    ("2H_LONGBOW_UNDEAD", "Arco Sussurrante (Whispering)", True, 0, 32),
+    ("2H_BOW_HELL", "Arco Lamenturiento (Wailing)", True, 0, 32),
+    ("2H_BOW_KEEPER", "Arco de Badon (Badon)", True, 0, 32),
+    ("2H_BOW_AVALON", "Perfurador de Névoa (Mistpiercer)", True, 0, 32),
+]
+
+CROSSBOW_VARIANTS = [
+    ("2H_CROSSBOW", "Besta (Crossbow)", False, 12, 20),
+    ("2H_CROSSBOWLARGE", "Besta Pesada (Heavy Crossbow)", False, 12, 20),
+    ("MAIN_1HCROSSBOW", "Besta Leve (Light Crossbow 1M)", False, 8, 16),
+    ("2H_REPEATINGCROSSBOW_UNDEAD", "Repetidora Lamenturienta (Weeping)", True, 12, 20),
+    ("2H_DUALCROSSBOW_HELL", "Atiradores de Dardos (Boltcasters)", True, 12, 20),
+    ("2H_CROSSBOWLARGE_MORGANA", "Besta de Cerco (Siegebow)", True, 12, 20),
+    ("2H_CROSSBOW_CANNON_AVALON", "Moldador de Energia (Energy Shaper)", True, 12, 20),
+]
+
+PIECES = [
+    ("ARMOR", "Armadura", 16, 0, "plate"),
+    ("HEAD", "Elmo", 8, 0, "plate"),
+    ("SHOES", "Botas", 8, 0, "plate"),
+    ("BOW", "Arco", 0, 32, "bow"),
+    ("CROSSBOW", "Besta", 12, 20, "crossbow"),
+]
 CITIES = ["Thetford", "Martlock", "Bridgewatch", "Lymhurst", "Fort Sterling"]
 
 ROYAL_SIGILS = {
@@ -60,9 +87,21 @@ def first_recipe(un):
     return [(r["@uniquename"], int(r["@count"])) for r in res]
 
 artifacts, item_names = {}, {}
-for code, disp, uses, is_royal in VARIANTS:
+all_variants = []
+
+# 1. Placas
+for code, disp, uses, is_royal in PLATE_VARIANTS:
+    all_variants.append({
+        "code": code,
+        "name": disp,
+        "artifact": uses,
+        "royal": is_royal,
+        "cat": "plate",
+    })
     if is_royal:
-        for slot, pname, _ in PIECES:
+        for slot, pname, _, _, pcat in PIECES:
+            if pcat != "plate":
+                continue
             for t in range(4, 9):
                 for e in range(5):
                     suf = f"@{e}" if e else ""
@@ -70,12 +109,16 @@ for code, disp, uses, is_royal in VARIANTS:
                     item_names[un] = names.get(un, un)
         continue
 
-    for slot, pname, nbars in PIECES:
+    for slot, pname, nbars, _, pcat in PIECES:
+        if pcat != "plate":
+            continue
         for t in range(4, 9):
             un = f"T{t}_{slot}_PLATE_{code}"
             rec = first_recipe(un)
             assert rec[0] == (f"T{t}_METALBAR", nbars), (un, rec)
-            item_names[un] = names.get(un, un)
+            for e in range(5):
+                suf = f"@{e}" if e else ""
+                item_names[f"{un}{suf}"] = names.get(f"{un}{suf}", names.get(un, un))
             if uses:
                 art_id, cnt = rec[1]
                 assert cnt == 1 and "ARTEFACT" in art_id
@@ -87,14 +130,80 @@ for code, disp, uses, is_royal in VARIANTS:
             else:
                 assert len(rec) == 1
 
+# 2. Arcos
+for code, disp, uses, nbars, nplanks in BOW_VARIANTS:
+    all_variants.append({
+        "code": code,
+        "name": disp,
+        "artifact": uses,
+        "royal": False,
+        "cat": "bow",
+        "bars": nbars,
+        "planks": nplanks,
+    })
+    slot = "BOW"
+    for t in range(4, 9):
+        un = f"T{t}_{code}"
+        rec = first_recipe(un)
+        assert rec[0] == (f"T{t}_PLANKS", nplanks), (un, rec)
+        for e in range(5):
+            suf = f"@{e}" if e else ""
+            item_names[f"{un}{suf}"] = names.get(f"{un}{suf}", names.get(un, un))
+        if uses:
+            art_id, cnt = rec[1]
+            assert cnt == 1 and "ARTEFACT" in art_id, (un, rec)
+            artifacts[f"{code}_{slot}_{t}"] = {
+                "id": art_id,
+                "name": re.sub(r"^\w+'s ", "", names.get(art_id, art_id)),
+                "iv": int(index[art_id]["@itemvalue"]),
+            }
+        else:
+            assert len(rec) == 1, (un, rec)
+
+# 3. Bestas
+for code, disp, uses, nbars, nplanks in CROSSBOW_VARIANTS:
+    all_variants.append({
+        "code": code,
+        "name": disp,
+        "artifact": uses,
+        "royal": False,
+        "cat": "crossbow",
+        "bars": nbars,
+        "planks": nplanks,
+    })
+    slot = "CROSSBOW"
+    for t in range(4, 9):
+        un = f"T{t}_{code}"
+        rec = first_recipe(un)
+        assert rec[0] == (f"T{t}_PLANKS", nplanks), (un, rec)
+        assert rec[1] == (f"T{t}_METALBAR", nbars), (un, rec)
+        for e in range(5):
+            suf = f"@{e}" if e else ""
+            item_names[f"{un}{suf}"] = names.get(f"{un}{suf}", names.get(un, un))
+        if uses:
+            art_id, cnt = rec[2]
+            assert cnt == 1 and "ARTEFACT" in art_id, (un, rec)
+            artifacts[f"{code}_{slot}_{t}"] = {
+                "id": art_id,
+                "name": re.sub(r"^\w+'s ", "", names.get(art_id, art_id)),
+                "iv": int(index[art_id]["@itemvalue"]),
+            }
+        else:
+            assert len(rec) == 2, (un, rec)
+
 for t, sig in ROYAL_SIGILS.items():
     item_names[sig["id"]] = names.get(sig["id"], sig["name"])
 
 gd = {
     "cities": CITIES,
     "saleLocs": CITIES + ["Caerleon", "Black Market"],
-    "variants": [{"code": c, "name": n, "artifact": a, "royal": r} for c, n, a, r in VARIANTS],
-    "pieces": [{"slot": s, "name": n, "bars": b} for s, n, b in PIECES],
+    "categories": [
+        {"id": "plate", "name": "🛡️ Placas"},
+        {"id": "bow", "name": "🏹 Arcos"},
+        {"id": "crossbow", "name": "🎯 Bestas"},
+    ],
+    "variants": all_variants,
+    "pieces": [{"slot": s, "name": n, "bars": b, "planks": pl, "cat": c} for s, n, b, pl, c in PIECES],
     "artifacts": artifacts,
     "royal": {
         "sigils": {str(t): v for t, v in ROYAL_SIGILS.items()},

@@ -1,24 +1,35 @@
-# ⚒️ Albion Craft & Refino (Equipamentos de Placas)
+# ⚒️ Albion Craft & Refino (Placas, Arcos & Bestas)
 
-Sistema integrado de **Refino de Minérios** e **Craft de Equipamentos de Placas** para o jogo **Albion Online**, com cálculo de custo unitário real (cadeia integrada), planejador de lotes, ranking de lucratividade e busca automática de preços em tempo real via **Albion Online Data Project**.
+Sistema integrado de **Refino de Minérios e Madeiras** e **Craft de Equipamentos de Placas, Arcos e Bestas** para o jogo **Albion Online**, com cálculo de custo unitário real (cadeia integrada), planejador de lotes, ranking de lucratividade, análise de qualidade (Q1–Q5), proteção anti-slippage (VWAP) e leitura automática de mercado em tempo real.
 
 ---
 
 ## 📋 Funcionalidades
 
-1. **Refino Estratégico (Cascata Completa vs Barra Anterior Pronta):**
+1. **Refino Estratégico de Metal e Madeira (Cascata Completa vs Anterior Pronta):**
+   - Suporte completo às duas cadeias de refino (**T2.0 ao T8.4**):
+     - **⛏️ Minério $\rightarrow$ Barras de Metal** (`T2_ORE`..`T8_METALBAR`)
+     - **🪵 Madeira $\rightarrow$ Tábuas de Madeira** (`T2_WOOD`..`T8_PLANKS`)
    - Compara em tempo real os dois métodos de refino:
-     - **Barra Anterior:** Compra a barra T-1 pronta no mercado mais barato + minério bruto do tier (ideal para ciclos rápidos, menos peso de transporte e economia de capital).
+     - **Barra / Tábua Anterior (T-1):** Compra o material refinado T-1 pronto no mercado mais barato + recurso bruto do tier (ideal para ciclos rápidos, menos peso de transporte e menor imobilização de capital).
      - **Cascata Completa:** Refina desde o T2 do zero aproveitando todos os retornos de recursos acumulados.
-   - Informa a economia exata em prata por barra entre os dois métodos e indica o vencedor.
-   - Compara também com o **preço da barra pronta no mercado**, escolhendo a rota mais barata (ou permitindo escolha manual por barra).
-   - Decompõe a **Lista de Compras** dinamicamente: se você optar por *Barra Anterior*, a lista pede a barra T-1 e o minério atual sem exigir minérios dos tiers anteriores.
+   - Informa a economia exata em prata por unidade entre os dois métodos e indica o vencedor.
+   - Compara também com o **preço do material refinado pronto no mercado**, escolhendo a rota mais barata automaticamente (ou permitindo escolha manual por tier/encantamento).
+   - Decompõe a **Lista de Compras** dinamicamente para ambos os recursos.
 
-2. **Craft de Equipamentos de Placas:**
-   - Cobre **armaduras, elmos e botas** em todos os tiers e encantamentos (**T4.0 ao T8.4** — 600 combinações possíveis).
-   - Suporte a variantes comuns (**Soldado, Cavaleiro, Guardião**) e variantes com artefato (**Graveguard, Demônio, Juiz, Duskweaver, Valor**).
-   - Cálculo exato da taxa da forja baseada no *Item Value* oficial e dedução do retorno de recursos do craft.
-   - Artefatos configurados sem retorno (mecânica oficial do jogo).
+2. **Craft de Placas, Arcos e Bestas (1.025 combinações T4.0 ao T8.4):**
+   - **🛡️ Equipamentos de Placas (Armadura, Elmo e Botas — 675 itens):**
+     - Variantes comuns (**Soldado, Cavaleiro, Guardião**).
+     - Variantes de artefato (**Graveguard, Demônio, Juiz, Duskweaver, Valor**).
+     - Variante **👑 Real (Royal)**: calcula automaticamente a rota mais econômica para a peça base (forjar a mais barata entre Soldado/Cavaleiro/Guardião ou comprar pronta no mercado) + **Emblemas Reais (T4 a T8)** sem retorno de recurso e taxa zero de conversão.
+   - **🏹 Arcos (175 itens — 32× Tábuas):**
+     - **Arco (Bow)**, **Arco de Guerra (Warbow)** e **Arco Longo (Longbow)**.
+     - Artefato: **Arco Sussurrante (Whispering)**, **Arco Lamenturiento (Wailing)**, **Arco de Badon (Badon)** e **Perfurador de Névoa (Mistpiercer)**.
+   - **🎯 Bestas (175 itens — Tábuas + Barras de Metal):**
+     - **Besta (Crossbow)** e **Besta Pesada (Heavy Crossbow)** (20× Tábuas + 12× Barras).
+     - **Besta Leve (Light Crossbow 1M)** (16× Tábuas + 8× Barras).
+     - Artefato (20× Tábuas + 12× Barras + Artefato): **Repetidora Lamenturienta (Weeping)**, **Atiradores de Dardos (Boltcasters)**, **Besta de Cerco (Siegebow)** e **Moldador de Energia (Energy Shaper)**.
+   - Cálculo exato da taxa da estação baseada no *Item Value* oficial de todos os recursos somados + artefato.
 
 3. **Volume de Compra Diário & Risco de Liquidez (Anti-Prata Parada):**
    - Coleta o histórico real de compras diárias via API pública do **Albion Online Data Project** (média dos últimos 28 dias por cidade e Mercado Negro).
@@ -37,8 +48,8 @@ Sistema integrado de **Refino de Minérios** e **Craft de Equipamentos de Placas
    - **Consulta e edição individual** por qualidade na aba *Preços > Equipamentos*.
 
 5. **Proteção de Volume & Preço Médio (VWAP / Anti-Slippage):**
-   - Protege o artesão contra **anúncios trolls de 1 unidade** que distorcem o menor preço de mercado e iludem o cálculo de custos em compras grandes (ex.: precisar de 10.000 minérios quando só há 1 pelo preço mínimo).
-   - Calcula o **VWAP (Preço Médio Ponderado por Volume)** dos últimos 28 dias para transações reais de minérios e barras.
+   - Protege o artesão contra **anúncios trolls de 1 unidade** que distorcem o menor preço de mercado e iludem o cálculo de custos em compras grandes (ex.: precisar de milhares de minérios/madeiras quando só há 1 pelo preço mínimo).
+   - Calcula o **VWAP (Preço Médio Ponderado por Volume)** dos últimos 28 dias para transações reais de minérios, barras, madeiras, tábuas e artefatos.
    - Alertas visuais de derrapagem (`⚠️ Spot vs VWAP`) no Refino e no Planejador.
    - Modos de compra configuráveis: **Inteligente (Anti-Slippage)**, **Preço Médio Real (VWAP)**, **Menor Oferta Spot** e **Spot + Margem (5% ou 10%)**.
 
@@ -57,12 +68,12 @@ Sistema integrado de **Refino de Minérios** e **Craft de Equipamentos de Placas
    - Envio em lotes otimizados com pausa automática (*throttle*) e tratamento com retentativa inteligente para evitar erros de limite de requisições (`HTTP 429`).
    - Indicação visual de preços desatualizados (> 48h) e suporte a edição manual de qualquer valor.
 
-9. **Planejador & Lista de Compras:**
-   - Permite montar uma lista do que você deseja craftar e informa o custo total, receita esperada e lucro líquido.
-   - Gera uma **Lista de Compras Consolidada** (minérios, barras prontas e artefatos necessários já descontando os retornos de recursos esperados), indicando em qual cidade comprar cada item pelo menor preço.
+9. **Planejador & Lista de Compras Consolidada:**
+   - Permite misturar Placas, Arcos e Bestas no mesmo plano de produção e informa o custo total, receita esperada, lucro líquido e giro do lote.
+   - Gera uma **Lista de Compras Consolidada** separando **Minérios**, **Barras Prontas**, **Madeiras**, **Tábuas Prontas**, **Artefatos**, **Emblemas Reais** e **Peças Base** (já descontando os retornos de recursos esperados), indicando em qual cidade comprar cada item pelo menor preço.
 
 10. **Versão Planilha Excel:**
-   - Acompanha o arquivo `Planilha_Craft_Placas.xlsx` com fórmulas matemáticas idênticas e validadas diretamente no Excel.
+    - Acompanha o arquivo `Planilha_Craft_Placas.xlsx` com fórmulas matemáticas idênticas e validadas diretamente no Excel.
 
 ---
 

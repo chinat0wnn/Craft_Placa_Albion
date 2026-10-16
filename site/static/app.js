@@ -1,12 +1,13 @@
 'use strict';
-/* Albion Craft · Placas — lógica de refino integrado + craft (mesma matemática da planilha). */
+/* Albion Craft · Placas, Arcos & Bestas — lógica de refino integrado + craft (mesma matemática da planilha). */
 
 let GD = null;      // dados do jogo (receitas/artefatos)
 let ST = null;      // estado do usuário (preços, config, plano)
 let VIEW = 'plan';
 let priceTab = 'ore';
-let rankFilter = { variant: '', piece: '', tier: '', ench: '', minVol: '0', quality: 'mix', onlyPriced: true, sort: 'profitDaily' };
-let gearFilter = { variant: 'SET1', piece: '', tmin: 4, quality: '1' };
+let refineTab = 'bar';
+let rankFilter = { cat: '', variant: '', piece: '', tier: '', ench: '', minVol: '0', quality: 'mix', onlyPriced: true, sort: 'profitDaily' };
+let gearFilter = { cat: '', variant: 'SET1', piece: '', tmin: 4, quality: '1' };
 
 const QUALITIES = [
   { q: 1, name: 'Normal', short: 'Q1', weight: 0.45 },
@@ -20,6 +21,7 @@ const TIERS = [];
 for (let t = 4; t <= 8; t++) for (let e = 0; e <= 4; e++) TIERS.push(`${t}.${e}`);
 const BAR_KEYS = ['2.0', '3.0', ...TIERS];
 const ORE_QTY = { 2: 1, 3: 2, 4: 2, 5: 3, 6: 4, 7: 5, 8: 5 };
+const WOOD_QTY = { 2: 1, 3: 2, 4: 2, 5: 3, 6: 4, 7: 5, 8: 5 };
 const LOC_PT = { 'Black Market': 'Mercado Negro' };
 
 /* ---------------- utilidades ---------------- */
@@ -40,16 +42,34 @@ function toast(msg, ms = 3500) {
 const suf = e => e ? `_LEVEL${e}@${e}` : '';
 const barId = k => { const [t, e] = tv(k); return `T${t}_METALBAR${suf(e)}`; };
 const oreId = k => { const [t, e] = tv(k); return `T${t}_ORE${suf(e)}`; };
-const itemId = (code, slot, k) => { const [t, e] = tv(k); return `T${t}_${slot}_PLATE_${code}${e ? '@' + e : ''}`; };
-const artOf = (code, slot, t) => GD.artifacts[`${code}_${slot}_${t}`] || null;
+const plankId = k => { const [t, e] = tv(k); return `T${t}_PLANKS${suf(e)}`; };
+const woodId = k => { const [t, e] = tv(k); return `T${t}_WOOD${suf(e)}`; };
 const variant = code => GD.variants.find(v => v.code === code);
 const piece = slot => GD.pieces.find(p => p.slot === slot);
+const piecesOf = codeOrV => {
+  const v = typeof codeOrV === 'string' ? variant(codeOrV) : codeOrV;
+  const cat = (v && v.cat) || 'plate';
+  return GD.pieces.filter(p => (p.cat || 'plate') === cat);
+};
+const matReq = (v, p) => ({
+  bars: (v && v.bars !== undefined) ? v.bars : (p ? p.bars || 0 : 0),
+  planks: (v && v.planks !== undefined) ? v.planks : (p ? p.planks || 0 : 0)
+});
+const itemId = (code, slot, k) => {
+  const [t, e] = tv(k);
+  const v = variant(code);
+  if (v && (v.cat === 'bow' || v.cat === 'crossbow')) {
+    return `T${t}_${code}${e ? '@' + e : ''}`;
+  }
+  return `T${t}_${slot}_PLATE_${code}${e ? '@' + e : ''}`;
+};
+const artOf = (code, slot, t) => GD.artifacts[`${code}_${slot}_${t}`] || null;
 function lowerBar(k) {
   const [t, e] = tv(k);
   if (t === 2) return null;
   if (t === 3) return '2.0';
-  if (t === 4) return '3.0';            // T4.x sempre usa a barra T3.0
-  return `${t - 1}.${e}`;               // T5+ usa a barra inferior do mesmo encantamento
+  if (t === 4) return '3.0';            // T4.x sempre usa a barra/tábua T3.0
+  return `${t - 1}.${e}`;               // T5+ usa a barra/tábua inferior do mesmo encantamento
 }
 
 /* ---------------- preços e qualidades ---------------- */
@@ -325,40 +345,37 @@ function getMaterialBuy(id, reqQty = 1) {
 }
 
 /* ---------------- cálculos ---------------- */
-function computeBars() {
-  const c = ST.config, bars = {};
+function computeRefinedChain(rawIdFn, refinedIdFn, qtyMap, originsMap) {
+  const c = ST.config, out = {};
   for (const k of BAR_KEYS) {
     const [t, e] = tv(k);
     const iv = 2 ** t * 2 ** e;
-    const q = ORE_QTY[t];
+    const q = qtyMap[t];
     const lw = lowerBar(k);
-    const oreBuy = getMaterialBuy(oreId(k), q * 20);
-    const barBuy = getMaterialBuy(barId(k), 20);
-    const ore = oreBuy ? { price: oreBuy.price, loc: oreBuy.loc, spotPrice: oreBuy.spotPrice, vwap: oreBuy.vwap, slippageRisk: oreBuy.slippageRisk, reason: oreBuy.reason } : null;
-    const buy = barBuy ? { price: barBuy.price, loc: barBuy.loc, spotPrice: barBuy.spotPrice, vwap: barBuy.vwap, slippageRisk: barBuy.slippageRisk, reason: barBuy.reason } : null;
+    const rawBuy = getMaterialBuy(rawIdFn(k), q * 20);
+    const refBuy = getMaterialBuy(refinedIdFn(k), 20);
+    const ore = rawBuy ? { price: rawBuy.price, loc: rawBuy.loc, spotPrice: rawBuy.spotPrice, vwap: rawBuy.vwap, slippageRisk: rawBuy.slippageRisk, reason: rawBuy.reason } : null;
+    const buy = refBuy ? { price: refBuy.price, loc: refBuy.loc, spotPrice: refBuy.spotPrice, vwap: refBuy.vwap, slippageRisk: refBuy.slippageRisk, reason: refBuy.reason } : null;
     const fee = iv * 0.1125 * c.feeRefine / 100;
     const buyC = buy ? buy.price * (1 + c.taxBuy) : null;
     const oreC = ore ? ore.price * (1 + c.taxBuy) : null;
 
     // 1. Cascata Completa (refinando cada etapa desde o T2)
-    const lwCascade = lw ? (bars[lw] ? bars[lw].cascade : null) : 0;
+    const lwCascade = lw ? (out[lw] ? out[lw].cascade : null) : 0;
     const cascade = (oreC !== null && lwCascade !== null)
       ? (q * oreC + lwCascade) * (1 - c.retRefine) + fee
       : null;
 
-    // 2. Refino com Barra Anterior Pronta (comprando a barra T-1 pronta no mercado)
-    const lwBuy = lw ? (bars[lw] ? bars[lw].buyC : null) : null;
+    // 2. Refino com Anterior Pronta (comprando T-1 pronta no mercado)
+    const lwBuy = lw ? (out[lw] ? out[lw].buyC : null) : null;
     const step = !lw
       ? cascade
       : (oreC !== null && lwBuy !== null)
         ? (q * oreC + lwBuy) * (1 - c.retRefine) + fee
         : null;
 
-    const refine = cascade; // compatibilidade com scripts
+    const refine = cascade;
 
-    // Comparativo entre métodos de refino:
-    // Se stepDiff > 0: Cascata é mais barata por X prata.
-    // Se stepDiff < 0: Barra anterior pronta é mais barata por X prata.
     const stepDiff = (step !== null && cascade !== null && lw) ? step - cascade : null;
 
     let bestRefine = null, bestRefineMethod = null;
@@ -371,8 +388,7 @@ function computeBars() {
       bestRefine = step; bestRefineMethod = 'step';
     }
 
-    // Origem / Decisão:
-    let origin = ST.origins[k] || 'auto';
+    let origin = (originsMap && originsMap[k]) || 'auto';
     if (origin === 'refine') origin = 'auto';
 
     let eff = null, dec = null;
@@ -397,7 +413,7 @@ function computeBars() {
 
     const saveVsBuy = (buyC !== null && eff !== null) ? buyC - eff : null;
 
-    bars[k] = {
+    out[k] = {
       k, t, e, iv, q, lw, ore, oreC, buy, buyC, fee,
       cascade, step, stepDiff,
       refine,
@@ -405,18 +421,37 @@ function computeBars() {
       eff, dec, origin, saveVsBuy
     };
   }
-  return bars;
+  return out;
 }
 
-function computeBaseItem(bars, code, slot, k, targetQ = null) {
-  const c = ST.config, v = variant(code), p = piece(slot);
+function computeBars() {
+  return computeRefinedChain(oreId, barId, ORE_QTY, ST.origins || {});
+}
+
+function computePlanks() {
+  return computeRefinedChain(woodId, plankId, WOOD_QTY, ST.plankOrigins || {});
+}
+
+function computeBaseItem(bars, code, slot, k, targetQ = null, planks = null) {
+  const c = ST.config, v = variant(code) || GD.variants[0];
+  let p = piece(slot);
+  if (!p || (p.cat || 'plate') !== (v.cat || 'plate')) {
+    p = piecesOf(v)[0] || GD.pieces[0];
+    slot = p.slot;
+  }
   const [t] = tv(k);
   const b = bars[k];
+  const plMap = planks || computePlanks();
+  const pl = plMap[k];
+  const req = matReq(v, p);
   const art = v.artifact ? artOf(code, slot, t) : null;
   const artBuy = art ? getMaterialBuy(art.id, 1) : null;
-  const barsCost = b.eff !== null ? p.bars * b.eff * (1 - c.retCraft) : null;
+
+  const metalCost = req.bars > 0 ? (b && b.eff !== null ? req.bars * b.eff * (1 - c.retCraft) : null) : 0;
+  const planksCost = req.planks > 0 ? (pl && pl.eff !== null ? req.planks * pl.eff * (1 - c.retCraft) : null) : 0;
+  const barsCost = (metalCost !== null && planksCost !== null) ? metalCost + planksCost : null;
   const artCost = art ? (artBuy ? artBuy.price * (1 + c.taxBuy) : null) : 0;
-  const iv = p.bars * b.iv + (art ? art.iv : 0);
+  const iv = (req.bars * b.iv) + (req.planks * pl.iv) + (art ? art.iv : 0);
   const fee = iv * 0.1125 * c.feeCraft / 100;
   const cost = (barsCost !== null && artCost !== null) ? barsCost + artCost + fee : null;
   const itId = itemId(code, slot, k);
@@ -428,15 +463,22 @@ function computeBaseItem(bars, code, slot, k, targetQ = null) {
   const dailyVol = vol ? (vol.daily !== undefined ? vol.daily : 0) : null;
   const profitDaily = (dailyVol !== null) ? ((profit !== null && profit > 0) ? profit * dailyVol : (profit !== null && profit < 0 ? profit : 0)) : profit;
   return {
-    id: itId, code, slot, k, t, v, p, art, artBuy, barsCost, artCost, iv, fee, cost, sell, revenue, profit,
+    id: itId, code, slot, k, t, v, p,
+    nBars: req.bars, nPlanks: req.planks, metalCost, planksCost,
+    art, artBuy, barsCost, artCost, iv, fee, cost, sell, revenue, profit,
     vol, dailyVol, profitDaily,
     margin: profit !== null && cost ? profit / cost : null,
     name: `${v.name} · ${p.name} · T${k}`,
   };
 }
 
-function computeItem(bars, code, slot, k, targetQ = null) {
-  const c = ST.config, v = variant(code), p = piece(slot);
+function computeItem(bars, code, slot, k, targetQ = null, planks = null) {
+  const c = ST.config, v = variant(code) || GD.variants[0];
+  let p = piece(slot);
+  if (!p || (p.cat || 'plate') !== (v.cat || 'plate')) {
+    p = piecesOf(v)[0] || GD.pieces[0];
+    slot = p.slot;
+  }
   const [t] = tv(k);
   const qMode = targetQ || rankFilter.quality || ST.config.targetQuality || 'mix';
 
@@ -452,7 +494,7 @@ function computeItem(bars, code, slot, k, targetQ = null) {
     let bestBase = null;
     for (const bCode of roy.baseSets) {
       const bV = variant(bCode);
-      const bIt = computeBaseItem(bars, bCode, slot, k, targetQ);
+      const bIt = computeBaseItem(bars, bCode, slot, k, targetQ, planks);
       const bBuy = getMaterialBuy(itemId(bCode, slot, k), 1);
       const bBuyCost = bBuy ? bBuy.price * (1 + c.taxBuy) : null;
 
@@ -482,6 +524,7 @@ function computeItem(bars, code, slot, k, targetQ = null) {
     return {
       id: itId, code, slot, k, t, v, p,
       isRoyal: true,
+      nBars: p.bars || 0, nPlanks: 0, metalCost: baseCost, planksCost: 0,
       sigilInfo, sigilQty, sigilBuy, sigilCost,
       bestBase, baseCost,
       barsCost: baseCost,
@@ -495,19 +538,103 @@ function computeItem(bars, code, slot, k, targetQ = null) {
     };
   }
 
-  return computeBaseItem(bars, code, slot, k, targetQ);
+  return computeBaseItem(bars, code, slot, k, targetQ, planks);
 }
 
-function computePlan(bars) {
+function decomposeChainDemands(directMap, chainMap, rawIdFn, refIdFn, rawName, refName, missing) {
   const c = ST.config;
+  const demands = Object.fromEntries(BAR_KEYS.map(k => [k, directMap[k] || 0]));
+  const buyRefMap = {};
+  const buyRawMap = {};
+  const refineStats = {};
+
+  for (const k of [...BAR_KEYS].reverse()) {
+    const reqQty = demands[k];
+    if (!reqQty || reqQty < 1e-9) continue;
+    const b = chainMap[k];
+    const dec = b.dec || 'buy';
+
+    if (dec === 'buy') {
+      buyRefMap[k] = (buyRefMap[k] || 0) + reqQty;
+    } else if (dec === 'step') {
+      const oq = reqQty * b.q * (1 - c.retRefine);
+      buyRawMap[k] = (buyRawMap[k] || 0) + oq;
+      refineStats[k] = (refineStats[k] || 0) + reqQty;
+      if (b.lw) {
+        const prevQty = reqQty * (1 - c.retRefine);
+        buyRefMap[b.lw] = (buyRefMap[b.lw] || 0) + prevQty;
+      }
+    } else { // 'cascade'
+      const oq = reqQty * b.q * (1 - c.retRefine);
+      buyRawMap[k] = (buyRawMap[k] || 0) + oq;
+      refineStats[k] = (refineStats[k] || 0) + reqQty;
+      if (b.lw) {
+        const prevQty = reqQty * (1 - c.retRefine);
+        demands[b.lw] = (demands[b.lw] || 0) + prevQty;
+      }
+    }
+  }
+
+  const buyRef = [], buyRaw = [];
+  let slippageCount = 0;
+
+  for (const k of BAR_KEYS) {
+    const q = buyRefMap[k];
+    if (q && q > 1e-9) {
+      const b = chainMap[k];
+      const refBuy = getMaterialBuy(refIdFn(k), q);
+      const effPrice = refBuy ? refBuy.price * (1 + c.taxBuy) : (b.buyC || null);
+      if (effPrice === null) missing.push(`${refName} T${k}`);
+      if (refBuy && refBuy.slippageRisk) slippageCount++;
+      buyRef.push({
+        k, qty: q,
+        loc: refBuy ? refBuy.loc : (b.buy ? b.buy.loc : '—'),
+        price: effPrice,
+        total: effPrice ? q * effPrice : null,
+        slippageRisk: refBuy ? refBuy.slippageRisk : false,
+        spotPrice: refBuy ? refBuy.spotPrice : null,
+        vwap: refBuy ? refBuy.vwap : null,
+        reason: refBuy ? refBuy.reason : ''
+      });
+    }
+  }
+  for (const k of BAR_KEYS) {
+    const q = buyRawMap[k];
+    if (q && q > 1e-9) {
+      const b = chainMap[k];
+      const rawBuy = getMaterialBuy(rawIdFn(k), q);
+      const effPrice = rawBuy ? rawBuy.price * (1 + c.taxBuy) : (b.oreC || null);
+      if (!b.ore && !rawBuy) missing.push(`${rawName} T${k}`);
+      if (rawBuy && rawBuy.slippageRisk) slippageCount++;
+      buyRaw.push({
+        k, qty: q,
+        refineQty: refineStats[k] || 0,
+        loc: rawBuy ? rawBuy.loc : (b.ore ? b.ore.loc : '—'),
+        price: effPrice,
+        total: effPrice ? q * effPrice : null,
+        slippageRisk: rawBuy ? rawBuy.slippageRisk : false,
+        spotPrice: rawBuy ? rawBuy.spotPrice : null,
+        vwap: rawBuy ? rawBuy.vwap : null,
+        reason: rawBuy ? rawBuy.reason : ''
+      });
+    }
+  }
+
+  return { demands, buyRef, buyRaw, refineStats, slippageCount };
+}
+
+function computePlan(bars, planks = null) {
+  const c = ST.config;
+  const plMap = planks || computePlanks();
   const rows = ST.plan.map(r => {
-    const it = computeItem(bars, r.code, r.slot, r.k, r.quality || null);
+    const it = computeItem(bars, r.code, r.slot, r.k, r.quality || null, plMap);
     const qty = Number(r.qty) || 0;
-    return { ...r, qty, it, totalCost: it.cost !== null ? it.cost * qty : null, totalProfit: it.profit !== null ? it.profit * qty : null };
+    return { ...r, slot: it.slot, qty, it, totalCost: it.cost !== null ? it.cost * qty : null, totalProfit: it.profit !== null ? it.profit * qty : null };
   });
 
-  // Demanda direta de barras originada pelo craft de equipamentos
-  const direct = Object.fromEntries(BAR_KEYS.map(k => [k, 0]));
+  // Demanda direta de barras e tábuas originada pelo craft de equipamentos
+  const directBars = Object.fromEntries(BAR_KEYS.map(k => [k, 0]));
+  const directPlanks = Object.fromEntries(BAR_KEYS.map(k => [k, 0]));
   const arts = {};
   const royalSigils = {};
   const buyGearPieces = {};
@@ -527,14 +654,14 @@ function computePlan(bars) {
           buyGearPieces[gId] = buyGearPieces[gId] || { id: gId, name: r.it.bestBase.name + ' T' + r.k, qty: 0, buy: r.it.bestBase.buy, price: r.it.bestBase.cost };
           buyGearPieces[gId].qty += r.qty;
         } else {
-          // Craftar a peça base: repassa a demanda para as barras (com retorno de recurso no craft da peça base)
-          direct[r.k] += r.qty * r.it.p.bars * (1 - c.retCraft);
+          directBars[r.k] += r.qty * r.it.p.bars * (1 - c.retCraft);
         }
       } else {
         missing.push(`Peça base para ${r.it.name}`);
       }
     } else {
-      direct[r.k] += r.qty * r.it.p.bars * (1 - c.retCraft);
+      if (r.it.nBars > 0) directBars[r.k] += r.qty * r.it.nBars * (1 - c.retCraft);
+      if (r.it.nPlanks > 0) directPlanks[r.k] += r.qty * r.it.nPlanks * (1 - c.retCraft);
       if (r.it.art) {
         const id = r.it.art.id;
         arts[id] = arts[id] || { art: r.it.art, qty: 0, buy: r.it.artBuy };
@@ -543,86 +670,14 @@ function computePlan(bars) {
     }
   }
 
-  // Decomposição da demanda de barras:
-  // - se for 'buy': compra a barra pronta
-  // - se for 'step': compra minério atual + compra barra anterior pronta
-  // - se for 'cascade': compra minério atual + passa demanda para a barra anterior
-  const barDemands = Object.fromEntries(BAR_KEYS.map(k => [k, direct[k] || 0]));
-  const buyBarsMap = {};
-  const buyOreMap = {};
-  const refineStats = {};
+  const barDecomp = decomposeChainDemands(directBars, bars, oreId, barId, 'Minério', 'Barra pronta', missing);
+  const plankDecomp = decomposeChainDemands(directPlanks, plMap, woodId, plankId, 'Madeira', 'Tábua pronta', missing);
 
-  for (const k of [...BAR_KEYS].reverse()) {
-    const reqQty = barDemands[k];
-    if (!reqQty || reqQty < 1e-9) continue;
-    const b = bars[k];
-    const dec = b.dec || 'buy';
-
-    if (dec === 'buy') {
-      buyBarsMap[k] = (buyBarsMap[k] || 0) + reqQty;
-    } else if (dec === 'step') {
-      const oq = reqQty * b.q * (1 - c.retRefine);
-      buyOreMap[k] = (buyOreMap[k] || 0) + oq;
-      refineStats[k] = (refineStats[k] || 0) + reqQty;
-      if (b.lw) {
-        const prevBarQty = reqQty * (1 - c.retRefine);
-        buyBarsMap[b.lw] = (buyBarsMap[b.lw] || 0) + prevBarQty;
-      }
-    } else { // 'cascade'
-      const oq = reqQty * b.q * (1 - c.retRefine);
-      buyOreMap[k] = (buyOreMap[k] || 0) + oq;
-      refineStats[k] = (refineStats[k] || 0) + reqQty;
-      if (b.lw) {
-        const prevBarQty = reqQty * (1 - c.retRefine);
-        barDemands[b.lw] = (barDemands[b.lw] || 0) + prevBarQty;
-      }
-    }
-  }
-
-  const buyBars = [], buyOre = [];
-  let slippageCount = 0;
-
-  for (const k of BAR_KEYS) {
-    const q = buyBarsMap[k];
-    if (q && q > 1e-9) {
-      const b = bars[k];
-      const barBuy = getMaterialBuy(barId(k), q);
-      const effPrice = barBuy ? barBuy.price * (1 + c.taxBuy) : (b.buyC || null);
-      if (effPrice === null) missing.push(`Barra pronta T${k}`);
-      if (barBuy && barBuy.slippageRisk) slippageCount++;
-      buyBars.push({
-        k, qty: q,
-        loc: barBuy ? barBuy.loc : (b.buy ? b.buy.loc : '—'),
-        price: effPrice,
-        total: effPrice ? q * effPrice : null,
-        slippageRisk: barBuy ? barBuy.slippageRisk : false,
-        spotPrice: barBuy ? barBuy.spotPrice : null,
-        vwap: barBuy ? barBuy.vwap : null,
-        reason: barBuy ? barBuy.reason : ''
-      });
-    }
-  }
-  for (const k of BAR_KEYS) {
-    const q = buyOreMap[k];
-    if (q && q > 1e-9) {
-      const b = bars[k];
-      const oreBuy = getMaterialBuy(oreId(k), q);
-      const effPrice = oreBuy ? oreBuy.price * (1 + c.taxBuy) : (b.oreC || null);
-      if (!b.ore && !oreBuy) missing.push(`Minério T${k}`);
-      if (oreBuy && oreBuy.slippageRisk) slippageCount++;
-      buyOre.push({
-        k, qty: q,
-        refineQty: refineStats[k] || 0,
-        loc: oreBuy ? oreBuy.loc : (b.ore ? b.ore.loc : '—'),
-        price: effPrice,
-        total: effPrice ? q * effPrice : null,
-        slippageRisk: oreBuy ? oreBuy.slippageRisk : false,
-        spotPrice: oreBuy ? oreBuy.spotPrice : null,
-        vwap: oreBuy ? oreBuy.vwap : null,
-        reason: oreBuy ? oreBuy.reason : ''
-      });
-    }
-  }
+  const buyBars = barDecomp.buyRef;
+  const buyOre = barDecomp.buyRaw;
+  const buyPlanks = plankDecomp.buyRef;
+  const buyWood = plankDecomp.buyRaw;
+  const slippageCount = barDecomp.slippageCount + plankDecomp.slippageCount;
 
   const artList = Object.values(arts).map(a => {
     const artBuy = getMaterialBuy(a.art.id, a.qty);
@@ -651,12 +706,14 @@ function computePlan(bars) {
 
   const sum = arr => arr.reduce((s, x) => s + (x.total || 0), 0);
   const fees = rows.reduce((s, r) => s + r.it.fee * r.qty, 0)
-    + Object.entries(refineStats).reduce((s, [k, q]) => s + (q * bars[k].fee), 0);
+    + Object.entries(barDecomp.refineStats).reduce((s, [k, q]) => s + (q * bars[k].fee), 0)
+    + Object.entries(plankDecomp.refineStats).reduce((s, [k, q]) => s + (q * plMap[k].fee), 0);
 
   return {
-    rows, buyBars, buyOre, artList, sigilsList, baseGearList, missing, total: barDemands,
+    rows, buyBars, buyOre, buyPlanks, buyWood, artList, sigilsList, baseGearList, missing,
+    total: barDecomp.demands, totalPlanks: plankDecomp.demands,
     slippageCount,
-    invest: sum(buyBars) + sum(buyOre) + sum(artList) + sum(sigilsList) + sum(baseGearList), fees,
+    invest: sum(buyBars) + sum(buyOre) + sum(buyPlanks) + sum(buyWood) + sum(artList) + sum(sigilsList) + sum(baseGearList), fees,
     cost: rows.reduce((s, r) => s + (r.totalCost || 0), 0),
     revenue: rows.reduce((s, r) => s + (r.it.revenue !== null ? r.it.revenue * r.qty : 0), 0),
     profit: rows.reduce((s, r) => s + (r.totalProfit || 0), 0),
@@ -689,9 +746,47 @@ function render() {
 }
 
 const opt = (val, label, sel) => `<option value="${esc(val)}"${String(val) === String(sel) ? ' selected' : ''}>${esc(label)}</option>`;
-const variantOpts = sel => GD.variants.map(v => opt(v.code, v.name + (v.royal ? ' 👑' : v.artifact ? ' ★' : ''), sel)).join('');
-const pieceOpts = sel => GD.pieces.map(p => opt(p.slot, p.name, sel)).join('');
+const catOpts = sel => (GD.categories || [
+  { id: 'plate', name: '🛡️ Placas' },
+  { id: 'bow', name: '🏹 Arcos' },
+  { id: 'crossbow', name: '🎯 Bestas' }
+]).map(c => opt(c.id, c.name, sel)).join('');
+
+const variantOpts = (sel, catFilter = '') => {
+  const cats = GD.categories || [
+    { id: 'plate', name: '🛡️ Placas' },
+    { id: 'bow', name: '🏹 Arcos' },
+    { id: 'crossbow', name: '🎯 Bestas' }
+  ];
+  if (catFilter) {
+    return GD.variants
+      .filter(v => (v.cat || 'plate') === catFilter)
+      .map(v => opt(v.code, v.name + (v.royal ? ' 👑' : v.artifact ? ' ★' : ''), sel))
+      .join('');
+  }
+  return cats.map(c => {
+    const vs = GD.variants.filter(v => (v.cat || 'plate') === c.id);
+    if (!vs.length) return '';
+    return `<optgroup label="${esc(c.name)}">${vs.map(v => opt(v.code, v.name + (v.royal ? ' 👑' : v.artifact ? ' ★' : ''), sel)).join('')}</optgroup>`;
+  }).join('');
+};
+
+const pieceOpts = (sel, catFilter = '') => GD.pieces
+  .filter(p => !catFilter || (p.cat || 'plate') === catFilter)
+  .map(p => opt(p.slot, p.name, sel))
+  .join('');
+
 const tierOpts = sel => TIERS.map(k => opt(k, 'T' + k, sel)).join('');
+
+function matBreakdownTip(it) {
+  if (it.isRoyal) {
+    return it.bestBase ? `Base: ${it.bestBase.name} (${it.bestBase.method === 'craft' ? 'craftar com barras' : 'comprar pronta'})` : 'Sem peça base';
+  }
+  const parts = [];
+  if (it.nPlanks > 0) parts.push(`${it.nPlanks}x Tábuas: ${fmt(it.planksCost)}s`);
+  if (it.nBars > 0) parts.push(`${it.nBars}x Barras: ${fmt(it.metalCost)}s`);
+  return parts.join(' + ');
+}
 
 function liquiditySummary(rows) {
   if (!rows || !rows.length) return '—';
@@ -718,7 +813,8 @@ function liquiditySummary(rows) {
 /* ----- Planejador ----- */
 function viewPlan() {
   const bars = computeBars();
-  const P = computePlan(bars);
+  const planks = computePlanks();
+  const P = computePlan(bars, planks);
   const rows = P.rows.map((r, i) => {
     let timeStr = '<span class="muted">—</span>';
     if (r.it.vol) {
@@ -737,13 +833,18 @@ function viewPlan() {
       ? `<span class="q-badge q-${r.it.sell.quality || '1'}" title="${esc(r.it.sell.qualityName || '')}">${r.it.sell.qualityLabel || 'Q1'}</span><span class="badge-tip" title="${esc(formatQualityTooltip(r.it.sell.breakdown, r.it.sell.price, r.it.sell.qualityLabel))}">${fmt(r.it.sell.price)}</span>`
       : '<span class="muted">sem preço</span>';
 
+    const validPieces = piecesOf(r.code);
+    const matHtml = r.it.isRoyal
+      ? (r.it.bestBase ? `<span class="badge-tip" title="${esc(matBreakdownTip(r.it))}">${fmt(r.it.barsCost)}</span>` : '<span class="neg">sem base</span>')
+      : `<span class="badge-tip" title="${esc(matBreakdownTip(r.it))}">${fmt(r.it.barsCost)}</span>`;
+
     return `
     <tr>
       <td class="l"><select data-plan="${i}" data-f="code">${variantOpts(r.code)}</select></td>
-      <td class="l"><select data-plan="${i}" data-f="slot">${pieceOpts(r.slot)}</select></td>
+      <td class="l"><select data-plan="${i}" data-f="slot">${validPieces.map(p => opt(p.slot, p.name, r.slot)).join('')}</select></td>
       <td class="l"><select data-plan="${i}" data-f="k">${tierOpts(r.k)}</select></td>
       <td><input class="num" type="number" min="0" data-plan="${i}" data-f="qty" data-fk="plan-${i}" value="${r.qty}"></td>
-      <td>${r.it.isRoyal ? (r.it.bestBase ? `<span title="Base: ${esc(r.it.bestBase.name)} (${r.it.bestBase.method === 'craft' ? 'craftar com barras' : 'comprar pronta'})">${fmt(r.it.barsCost)}</span>` : '<span class="neg">sem base</span>') : fmt(r.it.barsCost)}</td>
+      <td>${matHtml}</td>
       <td class="l muted">${r.it.isRoyal ? (r.it.sigilInfo ? `<span title="${r.it.sigilQty * r.qty}x ${esc(r.it.sigilInfo.name)}">👑 ${fmt(r.it.artCost)}</span>` : '—') : (r.it.art ? `<span title="${esc(r.it.art.name)}">${fmt(r.it.artCost)}</span>` : '—')}</td>
       <td>${fmt(r.it.fee)}</td>
       <td><b>${fmt(r.it.cost)}</b></td>
@@ -769,8 +870,8 @@ function viewPlan() {
     </div>` : '';
 
   return `
-  <h2>Planejador de craft</h2>
-  <div class="muted">Escolha o que vai craftar. A lista de compras considera o retorno de recursos (refino e craft), a demanda diária real, preços por qualidade e proteção contra ofertas falsas de 1 unidade.</div>
+  <h2>Planejador de craft · Placas, Arcos & Bestas</h2>
+  <div class="muted">Escolha o que vai craftar. A lista de compras decompõe automaticamente Barras, Minérios, Tábuas, Madeiras, Artefatos e Emblemas Reais considerando o retorno de recursos, demanda diária e proteção contra ofertas falsas de 1 unidade.</div>
   <div class="cards">
     <div class="stat"><div class="label">Total a investir (compras)</div><div class="value">${fmt(P.invest)}</div></div>
     <div class="stat"><div class="label">Taxas de barraca (refino + craft)</div><div class="value">${fmt(P.fees)}</div></div>
@@ -781,7 +882,7 @@ function viewPlan() {
   ${slippageBanner}
   ${P.missing.length ? `<div class="card" style="border-color:#6b5a2a">⚠️ Faltam preços para: <b>${esc([...new Set(P.missing)].join(', '))}</b> — preencha na aba Preços ou use “Buscar preços”.</div>` : ''}
   <div class="tablewrap"><table>
-    <tr><th class="l">Variante</th><th class="l">Peça</th><th class="l">Tier</th><th>Qtd</th><th>Barras / Base</th><th>Artefato / Emblema</th><th>Taxa ferreiro</th>
+    <tr><th class="l">Item / Variante</th><th class="l">Peça / Tipo</th><th class="l">Tier</th><th>Qtd</th><th title="Custo líquido de Barras e/ou Tábuas (ou Peça Base para Reais)">Materiais / Base</th><th>Artefato / Emblema</th><th>Taxa estação</th>
     <th>Custo / peça</th><th>Melhor venda</th><th class="l">Local</th><th>Lucro / peça</th><th>Margem</th><th>Lucro total</th>
     <th title="Volume de compra diário no mercado de venda (média últimos 28 dias)">Demanda / dia</th>
     <th title="Tempo estimado para escoar o lote com base na demanda diária">Tempo p/ vender</th><th></th></tr>
@@ -800,7 +901,7 @@ function viewPlan() {
   </div>
   <h3>Lista de compras</h3>
   <div class="grid3">
-    ${list('Minério (para refinar)', P.buyOre, [
+    ${list('⛏️ Minério (para refinar)', P.buyOre, [
       ['Minério', x => 'T' + x.k, 'l'],
       ['Qtd', x => fmt(Math.ceil(x.qty))],
       ['Cidade', x => x.loc, 'l'],
@@ -808,28 +909,43 @@ function viewPlan() {
       ['Total', x => fmt(x.total)],
       ['Barras a refinar', x => fmt(Math.ceil(x.refineQty))]
     ])}
-    ${list('Barras prontas', P.buyBars, [
+    ${list('🔩 Barras prontas', P.buyBars, [
       ['Barra', x => 'T' + x.k, 'l'],
       ['Qtd', x => fmt(Math.ceil(x.qty))],
       ['Cidade', x => x.loc || '', 'l'],
       ['Preço Unit.', x => fmt(x.price) + (x.slippageRisk ? ` <span class="slippage-pill badge-tip" title="${esc(x.reason)}">⚠️ Spot: ${fmt(x.spotPrice)}s | Média: ${fmt(x.vwap)}s</span>` : '')],
       ['Total', x => fmt(x.total)]
     ])}
-    ${list('Artefatos', P.artList, [
+    ${list('🪵 Madeira (para refinar)', P.buyWood, [
+      ['Madeira', x => 'T' + x.k, 'l'],
+      ['Qtd', x => fmt(Math.ceil(x.qty))],
+      ['Cidade', x => x.loc, 'l'],
+      ['Preço Unit.', x => fmt(x.price) + (x.slippageRisk ? ` <span class="slippage-pill badge-tip" title="${esc(x.reason)}">⚠️ Spot: ${fmt(x.spotPrice)}s | Média: ${fmt(x.vwap)}s</span>` : '')],
+      ['Total', x => fmt(x.total)],
+      ['Tábuas a refinar', x => fmt(Math.ceil(x.refineQty))]
+    ])}
+    ${list('🪚 Tábuas prontas', P.buyPlanks, [
+      ['Tábua', x => 'T' + x.k, 'l'],
+      ['Qtd', x => fmt(Math.ceil(x.qty))],
+      ['Cidade', x => x.loc || '', 'l'],
+      ['Preço Unit.', x => fmt(x.price) + (x.slippageRisk ? ` <span class="slippage-pill badge-tip" title="${esc(x.reason)}">⚠️ Spot: ${fmt(x.spotPrice)}s | Média: ${fmt(x.vwap)}s</span>` : '')],
+      ['Total', x => fmt(x.total)]
+    ])}
+    ${list('★ Artefatos', P.artList, [
       ['Artefato', x => esc(x.art.name) + ` <span class="muted">T${x.art.id[1]}</span>`, 'l'],
       ['Qtd', x => fmt(x.qty)],
       ['Cidade', x => x.buy ? x.buy.loc : '<span class="neg">sem preço</span>', 'l'],
       ['Preço Unit.', x => fmt(x.price) + (x.slippageRisk ? ` <span class="slippage-pill badge-tip" title="${esc(x.reason)}">⚠️ Spot: ${fmt(x.spotPrice)}s | Média: ${fmt(x.vwap)}s</span>` : '')],
       ['Total', x => fmt(x.total)]
     ])}
-    ${P.sigilsList && P.sigilsList.length ? list('Emblemas Reais', P.sigilsList, [
+    ${P.sigilsList && P.sigilsList.length ? list('👑 Emblemas Reais', P.sigilsList, [
       ['Emblema', x => esc(x.name), 'l'],
       ['Qtd', x => fmt(x.qty)],
       ['Cidade', x => x.buy ? x.buy.loc : '<span class="neg">sem preço</span>', 'l'],
       ['Preço Unit.', x => fmt(x.price)],
       ['Total', x => fmt(x.total)]
     ]) : ''}
-    ${P.baseGearList && P.baseGearList.length ? list('Peças Base (comprar prontas)', P.baseGearList, [
+    ${P.baseGearList && P.baseGearList.length ? list('🛡️ Peças Base (comprar prontas)', P.baseGearList, [
       ['Peça', x => esc(x.name), 'l'],
       ['Qtd', x => fmt(x.qty)],
       ['Cidade', x => x.buy ? x.buy.loc : '<span class="neg">sem preço</span>', 'l'],
@@ -842,17 +958,22 @@ function viewPlan() {
 
 /* ----- Ranking ----- */
 function viewRank() {
-  const bars = computeBars(), f = rankFilter;
+  const bars = computeBars(), planks = computePlanks(), f = rankFilter;
   let items = [];
-  for (const v of GD.variants) for (const p of GD.pieces) for (const k of TIERS) {
+  for (const v of GD.variants) {
+    if (f.cat && (v.cat || 'plate') !== f.cat) continue;
     if (f.variant && v.code !== f.variant) continue;
-    if (f.piece && p.slot !== f.piece) continue;
-    if (f.tier && tv(k)[0] !== Number(f.tier)) continue;
-    if (f.ench !== '' && tv(k)[1] !== Number(f.ench)) continue;
-    const it = computeItem(bars, v.code, p.slot, k);
-    if (f.onlyPriced && it.profit === null) continue;
-    if (f.minVol && Number(f.minVol) > 0 && (it.dailyVol === null || it.dailyVol < Number(f.minVol))) continue;
-    items.push(it);
+    for (const p of piecesOf(v)) {
+      if (f.piece && p.slot !== f.piece) continue;
+      for (const k of TIERS) {
+        if (f.tier && tv(k)[0] !== Number(f.tier)) continue;
+        if (f.ench !== '' && tv(k)[1] !== Number(f.ench)) continue;
+        const it = computeItem(bars, v.code, p.slot, k, null, planks);
+        if (f.onlyPriced && it.profit === null) continue;
+        if (f.minVol && Number(f.minVol) > 0 && (it.dailyVol === null || it.dailyVol < Number(f.minVol))) continue;
+        items.push(it);
+      }
+    }
   }
   const key = {
     profitDaily: 'profitDaily',
@@ -869,7 +990,7 @@ function viewRank() {
     ` : '—';
     return `
     <tr><td class="l">${esc(it.v.name)}</td><td class="l">${it.p.name}</td><td class="l">T${it.k}</td>
-    <td>${fmt(it.barsCost)}</td><td>${it.art ? fmt(it.artCost) : '—'}</td><td class="l muted">${it.art ? esc(it.art.name) + (it.artBuy ? ' · ' + it.artBuy.loc : '') : ''}</td>
+    <td><span class="badge-tip" title="${esc(matBreakdownTip(it))}">${fmt(it.barsCost)}</span></td><td>${it.art ? fmt(it.artCost) : '—'}</td><td class="l muted">${it.art ? esc(it.art.name) + (it.artBuy ? ' · ' + it.artBuy.loc : '') : ''}</td>
     <td>${fmt(it.fee)}</td><td><b>${fmt(it.cost)}</b></td>
     <td class="best">${sellHtml}</td><td class="l">${it.sell ? locName(it.sell.loc) : ''}</td>
     <td class="${cls(it.profit)}"><b>${fmt(it.profit)}</b></td><td class="${cls(it.margin)}">${pct(it.margin)}</td>
@@ -880,10 +1001,11 @@ function viewRank() {
   }).join('');
   return `
   <h2>Ranking de lucro e demanda diária</h2>
-  <div class="muted">Cruzamento de lucratividade real com volume de compra por dia, preço por qualidade e proteção contra ofertas falsas de 1 unidade.</div>
+  <div class="muted">Cruzamento de lucratividade real (Placas, Arcos e Bestas) com volume de compra por dia, preço por qualidade e proteção contra ofertas falsas de 1 unidade.</div>
   <div class="toolbar">
-    <label>Variante<select data-rf="variant"><option value="">Todas</option>${variantOpts(f.variant)}</select></label>
-    <label>Peça<select data-rf="piece"><option value="">Todas</option>${pieceOpts(f.piece)}</select></label>
+    <label>Categoria<select data-rf="cat"><option value="">Todas</option>${catOpts(f.cat)}</select></label>
+    <label>Item / Variante<select data-rf="variant"><option value="">Todas</option>${variantOpts(f.variant, f.cat)}</select></label>
+    <label>Peça / Tipo<select data-rf="piece"><option value="">Todas</option>${pieceOpts(f.piece, f.cat)}</select></label>
     <label>Tier<select data-rf="tier"><option value="">Todos</option>${[4, 5, 6, 7, 8].map(t => opt(t, 'T' + t, f.tier)).join('')}</select></label>
     <label>Encantamento<select data-rf="ench"><option value="">Todos</option>${[0, 1, 2, 3, 4].map(e => opt(e, '.' + e, f.ench)).join('')}</select></label>
     <label>Qualidade de Venda<select data-rf="quality">
@@ -921,7 +1043,7 @@ function viewRank() {
     <span class="muted" style="margin-top:14px">${items.length} itens</span>
   </div>
   <div class="tablewrap"><table>
-    <tr><th class="l">Variante</th><th class="l">Peça</th><th class="l">Tier</th><th>Barras (líq.)</th><th>Artefato</th><th class="l">Artefato / cidade</th>
+    <tr><th class="l">Item / Variante</th><th class="l">Peça / Tipo</th><th class="l">Tier</th><th title="Custo líquido de Barras e/ou Tábuas após retorno">Materiais (líq.)</th><th>Artefato</th><th class="l">Artefato / cidade</th>
     <th>Taxa</th><th>Custo</th><th>Melhor venda</th><th class="l">Local</th><th>Lucro / un.</th><th>Margem</th>
     <th title="Volume de compra diário no mercado de venda (média últimos 28 dias)">Demanda / dia</th>
     <th title="Lucro diário estimado = Lucro unitário × Volume diário">Lucro / dia est.</th>
@@ -932,24 +1054,28 @@ function viewRank() {
 
 /* ----- Refino ----- */
 function viewRefine() {
-  const bars = computeBars();
+  const isPlank = refineTab === 'plank';
+  const chain = isPlank ? computePlanks() : computeBars();
+  const refNoun = isPlank ? 'Tábua' : 'Barra';
+  const rawNoun = isPlank ? 'Madeira' : 'Minério';
+  const originAttr = isPlank ? 'data-plankorigin' : 'data-origin';
+
   const decLabel = {
     buy: 'Comprar Pronta',
-    step: 'Barra Anterior',
+    step: `${refNoun} Anterior`,
     cascade: 'Cascata Total'
   };
 
   const body = BAR_KEYS.map(k => {
-    const b = bars[k];
-    const lwBar = b.lw ? bars[b.lw] : null;
+    const b = chain[k];
+    const lwBar = b.lw ? chain[b.lw] : null;
 
-    // Comparativo entre os dois métodos de refino:
     let compareHtml = '—';
     if (b.lw && b.step !== null && b.cascade !== null) {
       if (b.stepDiff > 1e-2) {
-        compareHtml = `<span class="pill win" title="Cascata economiza ${fmt(b.stepDiff, 1)} de prata por barra">Cascata (-${fmt(b.stepDiff, 0)})</span>`;
+        compareHtml = `<span class="pill win" title="Cascata economiza ${fmt(b.stepDiff, 1)} de prata por ${refNoun.toLowerCase()}">Cascata (-${fmt(b.stepDiff, 0)})</span>`;
       } else if (b.stepDiff < -1e-2) {
-        compareHtml = `<span class="pill win" style="background:#3b2a14;color:#f0a04b" title="Comprar a barra T-${b.lw} pronta economiza ${fmt(-b.stepDiff, 1)} de prata por barra">Barra Ant. (-${fmt(-b.stepDiff, 0)})</span>`;
+        compareHtml = `<span class="pill win" style="background:#3b2a14;color:#f0a04b" title="Comprar a ${refNoun.toLowerCase()} T-${b.lw} pronta economiza ${fmt(-b.stepDiff, 1)} de prata por ${refNoun.toLowerCase()}">${refNoun} Ant. (-${fmt(-b.stepDiff, 0)})</span>`;
       } else {
         compareHtml = `<span class="pill tie">Empate</span>`;
       }
@@ -962,18 +1088,18 @@ function viewRefine() {
 
     return `<tr>
       <td class="l"><b>T${k}</b></td>
-      <td class="l">${b.q}× Minério ${b.ore ? `<span class="muted">(${fmt(b.ore.price)} em ${b.ore.loc})</span>${b.ore.slippageRisk ? ` <span class="slippage-pill badge-tip" title="${esc(b.ore.reason)}">⚠️ Média: ${fmt(b.ore.vwap)}s</span>` : ''}` : '<span class="neg">s/ preço</span>'}</td>
+      <td class="l">${b.q}× ${rawNoun} ${b.ore ? `<span class="muted">(${fmt(b.ore.price)} em ${b.ore.loc})</span>${b.ore.slippageRisk ? ` <span class="slippage-pill badge-tip" title="${esc(b.ore.reason)}">⚠️ Média: ${fmt(b.ore.vwap)}s</span>` : ''}` : '<span class="neg">s/ preço</span>'}</td>
       <td class="l">${b.lw ? `T${b.lw} <span class="muted">(Mkt: ${fmt(lwBar?.buyC, 0)} | Cascat: ${fmt(lwBar?.cascade, 0)})</span>` : '—'}</td>
       <td class="${b.step !== null && b.bestRefineMethod === 'step' && b.lw ? 'pos' : ''}">${b.lw ? fmt(b.step, 1) : '—'}</td>
       <td class="${b.cascade !== null && b.bestRefineMethod === 'cascade' ? 'pos' : ''}">${fmt(b.cascade, 1)}</td>
       <td>${compareHtml}</td>
       <td>${b.buyC !== null ? fmt(b.buyC, 1) + (b.buy ? ` <span class="muted">(${b.buy.loc})</span>${b.buy.slippageRisk ? ` <span class="slippage-pill badge-tip" title="${esc(b.buy.reason)}">⚠️ Média: ${fmt(b.buy.vwap)}s</span>` : ''}` : '') : '<span class="muted">—</span>'}</td>
       <td class="l">
-        <select data-origin="${k}">
+        <select ${originAttr}="${k}">
           ${opt('auto', 'Automático (Mais Barato)', b.origin)}
-          ${b.lw ? opt('step', 'Refinar: Barra Anterior Pronta', b.origin) : ''}
+          ${b.lw ? opt('step', `Refinar: ${refNoun} Anterior Pronta`, b.origin) : ''}
           ${opt('cascade', 'Refinar: Cascata Completa', b.origin)}
-          ${opt('buy', 'Comprar Barra Pronta', b.origin)}
+          ${opt('buy', `Comprar ${refNoun} Pronta`, b.origin)}
         </select>
       </td>
       <td><b class="pos">${fmt(b.eff, 1)}</b></td>
@@ -983,32 +1109,36 @@ function viewRefine() {
   }).join('');
 
   return `
-  <h2>Refino de Barras · Comparativo Estratégico (Cascata vs Barra Anterior)</h2>
+  <h2>Refino · Comparativo Estratégico (Cascata vs ${refNoun} Anterior)</h2>
   <div class="muted">
     Compare o custo real de refino entre dois métodos:
-    <b>[Barra Anterior]</b> (compra a barra T-1 pronta no mercado mais barato + minério do tier) e 
+    <b>[${refNoun} Anterior]</b> (compra a ${refNoun.toLowerCase()} T-1 pronta no mercado mais barato + ${rawNoun.toLowerCase()} do tier) e 
     <b>[Cascata Completa]</b> (refina desde o T2 aproveitando os retornos acumulados).
-    O sistema indica qual método gera o menor custo (com a economia em prata por barra) e abastece a Lista de Compras do Planejador de acordo com a sua escolha.
+    O sistema indica qual método gera o menor custo e abastece a Lista de Compras do Planejador de acordo com a sua escolha.
+  </div>
+  <div class="subtabs" style="margin-top:12px">
+    <button data-rtab="bar" class="${refineTab === 'bar' ? 'active' : ''}">⛏️ Barras de Metal (Minério → Barra)</button>
+    <button data-rtab="plank" class="${refineTab === 'plank' ? 'active' : ''}">🪵 Tábuas de Madeira (Madeira → Tábua)</button>
   </div>
   <div class="toolbar" style="margin-top:10px;margin-bottom:14px">
-    <label>Modo de Compra de Minério/Barras<select data-cfg="materialPricing">
+    <label>Modo de Compra de Materiais<select data-cfg="materialPricing">
       ${opt('smart', '🛡️ Inteligente (Anti-Fake/Slippage)', ST.config.materialPricing)}
       ${opt('vwap', '📊 Preço Médio Real (VWAP)', ST.config.materialPricing)}
       ${opt('spot', '⚡ Menor Oferta Spot (Cru)', ST.config.materialPricing)}
       ${opt('buffer5', '🛡️ Spot + 5% Margem', ST.config.materialPricing)}
       ${opt('buffer10', '🛡️ Spot + 10% Margem', ST.config.materialPricing)}
     </select></label>
-    <button class="ghost" id="fetchMaterialsVolume" style="margin-top:14px">📊 Buscar volumes & VWAP de minérios e barras</button>
+    <button class="ghost" id="fetchMaterialsVolume" style="margin-top:14px">📊 Buscar volumes & VWAP de todos os materiais (Minério, Barra, Madeira, Tábua)</button>
   </div>
   <div class="tablewrap"><table>
     <tr>
-      <th class="l">Barra</th>
-      <th class="l">Minério Bruto</th>
-      <th class="l">Barra Anterior (T-1)</th>
-      <th>Custo [Barra Anterior]</th>
+      <th class="l">${refNoun}</th>
+      <th class="l">${rawNoun} Bruto</th>
+      <th class="l">${refNoun} Anterior (T-1)</th>
+      <th>Custo [${refNoun} Anterior]</th>
       <th>Custo [Cascata]</th>
       <th>Melhor Método</th>
-      <th>Barra Pronta (Mercado)</th>
+      <th>${refNoun} Pronta (Mercado)</th>
       <th class="l">Origem / Estratégia</th>
       <th>Custo Efetivo</th>
       <th>Decisão</th>
@@ -1037,7 +1167,14 @@ function priceTable(rows, locs, extraHead = '', extra = () => '', q = 1) {
     }).join('')}</table></div>`;
 }
 function viewPrices() {
-  const tabs = [['ore', 'Minério'], ['bar', 'Barras'], ['art', 'Artefatos & Emblemas'], ['gear', 'Equipamentos (venda)']];
+  const tabs = [
+    ['ore', '⛏️ Minério'],
+    ['bar', '🔩 Barras'],
+    ['wood', '🪵 Madeira'],
+    ['plank', '🪚 Tábuas'],
+    ['art', '★ Artefatos & Emblemas'],
+    ['gear', '⚔️ Equipamentos (venda)']
+  ];
   let content = '';
   if (priceTab === 'ore') {
     content = `
@@ -1053,6 +1190,20 @@ function viewPrices() {
       </div>
       ${priceTable(BAR_KEYS.map(k => ({ id: barId(k), label: `Barra T${k}` })), GD.cities)}`;
   }
+  if (priceTab === 'wood') {
+    content = `
+      <div class="toolbar" style="margin-bottom:8px">
+        <button class="ghost" id="fetchWoodVolumes">📊 Buscar volumes & VWAP de madeiras</button>
+      </div>
+      ${priceTable(BAR_KEYS.map(k => ({ id: woodId(k), label: `Madeira T${k}` })), GD.cities)}`;
+  }
+  if (priceTab === 'plank') {
+    content = `
+      <div class="toolbar" style="margin-bottom:8px">
+        <button class="ghost" id="fetchPlankVolumes">📊 Buscar volumes & VWAP de tábuas</button>
+      </div>
+      ${priceTable(BAR_KEYS.map(k => ({ id: plankId(k), label: `Tábua T${k}` })), GD.cities)}`;
+  }
   if (priceTab === 'art') {
     const rows = [];
     if (GD.royal) {
@@ -1061,19 +1212,23 @@ function viewPrices() {
         if (s) rows.push({ id: s.id, label: `👑 ${esc(s.name)} <span class="muted">T${t} · Emblema Real</span>` });
       }
     }
-    for (const v of GD.variants) if (v.artifact) for (const p of GD.pieces) for (let t = 4; t <= 8; t++) {
-      const a = artOf(v.code, p.slot, t); rows.push({ id: a.id, label: `${esc(a.name)} <span class="muted">T${t} · ${esc(v.name)} ${p.name}</span>` });
+    for (const v of GD.variants) if (v.artifact) for (const p of piecesOf(v)) for (let t = 4; t <= 8; t++) {
+      const a = artOf(v.code, p.slot, t);
+      if (a) rows.push({ id: a.id, label: `${esc(a.name)} <span class="muted">T${t} · ${esc(v.name)} ${p.name}</span>` });
     }
     content = priceTable(rows, GD.cities);
   }
   if (priceTab === 'gear') {
     const g = gearFilter, rows = [];
-    for (const v of GD.variants) if (v.code === g.variant) for (const p of GD.pieces) if (!g.piece || g.piece === p.slot)
-      for (const k of TIERS) if (tv(k)[0] >= Number(g.tmin)) rows.push({ id: itemId(v.code, p.slot, k), label: `${p.name} T${k}` });
+    for (const v of GD.variants) if (v.code === g.variant) for (const p of piecesOf(v)) if (!g.piece || g.piece === p.slot)
+      for (const k of TIERS) if (tv(k)[0] >= Number(g.tmin)) rows.push({ id: itemId(v.code, p.slot, k), label: `${v.name} · ${p.name} T${k}` });
     const curQ = Number(g.quality) || 1;
+    const curV = variant(g.variant);
+    const vCat = g.cat || (curV && curV.cat) || '';
     content = `<div class="toolbar">
-      <label>Variante<select data-gf="variant">${variantOpts(g.variant)}</select></label>
-      <label>Peça<select data-gf="piece"><option value="">Todas</option>${pieceOpts(g.piece)}</select></label>
+      <label>Categoria<select data-gf="cat"><option value="">Todas</option>${catOpts(g.cat)}</select></label>
+      <label>Item / Variante<select data-gf="variant">${variantOpts(g.variant, g.cat)}</select></label>
+      <label>Peça / Tipo<select data-gf="piece"><option value="">Todas</option>${pieceOpts(g.piece, vCat)}</select></label>
       <label>Tier mínimo<select data-gf="tmin">${[4, 5, 6, 7, 8].map(t => opt(t, 'T' + t, g.tmin)).join('')}</select></label>
       <label>Qualidade<select data-gf="quality">
         ${QUALITIES.map(qObj => opt(qObj.q, `${qObj.short} · ${qObj.name}`, curQ)).join('')}
@@ -1128,15 +1283,15 @@ function viewConfig() {
       </select></td></tr>
     ${row('taxBuy', 'Taxa de compra', '0% comprando direto da oferta; 2,5% se criar ordem de compra.', true)}
     ${row('taxSell', 'Taxa total de venda', '6,5% com Premium (4% + 2,5% da ordem); 10,5% sem Premium. Vender direto em ordem de compra (ex.: Mercado Negro) = só 4% / 8%.', true)}
-    ${row('retRefine', 'Retorno de recursos no REFINO', 'Ex.: 36,7% em cidade com bônus de minério; 15,2% sem bônus; ~53,9% com foco.', true)}
-    ${row('retCraft', 'Retorno de recursos no CRAFT', 'Ex.: 24,8% em cidade com bônus de placas; 15,2% sem bônus; ~47,9% com foco.', true)}
-    ${row('feeRefine', 'Taxa da fundição', 'Prata por 100 de nutrição (mostrada na estação).', false)}
-    ${row('feeCraft', 'Taxa da forja de armaduras', 'Prata por 100 de nutrição.', false)}
+    ${row('retRefine', 'Retorno de recursos no REFINO', 'Ex.: 36,7% em cidade com bônus (Thetford p/ Minério, Fort Sterling p/ Madeira); 15,2% sem bônus; ~53,9% com foco.', true)}
+    ${row('retCraft', 'Retorno de recursos no CRAFT', 'Ex.: 24,8% em cidade com bônus (Thetford p/ Placas, Lymhurst p/ Arcos, Bridgewatch p/ Bestas); 15,2% sem bônus; ~47,9% com foco.', true)}
+    ${row('feeRefine', 'Taxa da fundição / serraria', 'Prata por 100 de nutrição (mostrada na estação).', false)}
+    ${row('feeCraft', 'Taxa da forja / cabana do caçador', 'Prata por 100 de nutrição.', false)}
   </table></div>
   <div class="card muted">
     <b style="color:var(--text)">Como é calculado</b><br>
     • Taxa de estação = valor do item × 0,1125 × taxa ÷ 100 (não é devolvida pelo retorno).<br>
-    • Valor do item da peça = barras × valor da barra + valor do artefato.<br>
+    • Valor do item da peça = (barras × valor da barra) + (tábuas × valor da tábua) + valor do artefato.<br>
     • Artefatos não retornam no craft (confirmado nos dados do jogo).<br>
     • Lucro = melhor preço de venda × (1 − taxa de venda) − custo total.<br>
     • Seus dados ficam salvos em <code>site/data.json</code>.
@@ -1148,40 +1303,49 @@ function viewConfig() {
 /* ---------------- API de preços ---------------- */
 function allIds() {
   const ids = new Set();
-  BAR_KEYS.forEach(k => { ids.add(oreId(k)); ids.add(barId(k)); });
+  BAR_KEYS.forEach(k => { ids.add(oreId(k)); ids.add(barId(k)); ids.add(woodId(k)); ids.add(plankId(k)); });
   Object.values(GD.artifacts).forEach(a => ids.add(a.id));
   if (GD.royal) Object.values(GD.royal.sigils).forEach(s => ids.add(s.id));
-  for (const v of GD.variants) for (const p of GD.pieces) for (const k of TIERS) ids.add(itemId(v.code, p.slot, k));
+  for (const v of GD.variants) for (const p of piecesOf(v)) for (const k of TIERS) ids.add(itemId(v.code, p.slot, k));
   return [...ids];
 }
 function tabIds() {
   if (priceTab === 'ore') return BAR_KEYS.map(oreId);
   if (priceTab === 'bar') return BAR_KEYS.map(barId);
+  if (priceTab === 'wood') return BAR_KEYS.map(woodId);
+  if (priceTab === 'plank') return BAR_KEYS.map(plankId);
   if (priceTab === 'art') {
     const list = Object.values(GD.artifacts).map(a => a.id);
     if (GD.royal) list.push(...Object.values(GD.royal.sigils).map(s => s.id));
     return list;
   }
   const g = gearFilter, ids = [];
-  for (const p of GD.pieces) if (!g.piece || g.piece === p.slot) for (const k of TIERS) if (tv(k)[0] >= Number(g.tmin)) ids.push(itemId(g.variant, p.slot, k));
+  for (const p of piecesOf(g.variant)) if (!g.piece || g.piece === p.slot) for (const k of TIERS) if (tv(k)[0] >= Number(g.tmin)) ids.push(itemId(g.variant, p.slot, k));
   return ids;
 }
 function planIds() {
   const ids = new Set();
   for (const r of ST.plan) {
-    ids.add(itemId(r.code, r.slot, r.k));
+    const v = variant(r.code) || GD.variants[0];
+    let p = piece(r.slot);
+    if (!p || (p.cat || 'plate') !== (v.cat || 'plate')) p = piecesOf(v)[0];
+    const req = matReq(v, p);
+    ids.add(itemId(r.code, p.slot, r.k));
     const [t] = tv(r.k);
-    const v = variant(r.code);
     if (v && v.royal && GD.royal) {
       const sig = GD.royal.sigils[t];
       if (sig) ids.add(sig.id);
-      for (const bCode of GD.royal.baseSets) ids.add(itemId(bCode, r.slot, r.k));
+      for (const bCode of GD.royal.baseSets) ids.add(itemId(bCode, p.slot, r.k));
     } else {
-      const a = (v && v.artifact) ? artOf(r.code, r.slot, t) : null;
+      const a = (v && v.artifact) ? artOf(r.code, p.slot, t) : null;
       if (a) ids.add(a.id);
     }
     let k = r.k;
-    while (k) { ids.add(barId(k)); ids.add(oreId(k)); k = lowerBar(k); }
+    while (k) {
+      if (req.bars > 0 || (v && v.royal)) { ids.add(barId(k)); ids.add(oreId(k)); }
+      if (req.planks > 0) { ids.add(plankId(k)); ids.add(woodId(k)); }
+      k = lowerBar(k);
+    }
   }
   return [...ids];
 }
@@ -1225,7 +1389,7 @@ async function fetchPrices(ids) {
       toast(`Buscando preços (Q1-Q5)… ${Math.round(done / ids.length * 100)}% (${progress})`, 60000);
       const data = await fetchChunk(ch, locs, progress);
       for (const e of data) {
-        const isGear = /_PLATE_/.test(e.item_id) && !/ARTEFACT/.test(e.item_id);
+        const isGear = !(/^(T\d+_(ORE|METALBAR|WOOD|PLANKS)|.*ARTEFACT.*|.*TOKEN_ROYAL.*)$/.test(e.item_id));
         const loc = e.city;
         if (!GD.saleLocs.includes(loc)) continue;
         if (!isGear && !GD.cities.includes(loc)) continue;
@@ -1269,18 +1433,28 @@ async function fetchPrices(ids) {
 /* ---------------- API de volume e histórico ---------------- */
 function gearIds() {
   const ids = [];
-  for (const v of GD.variants) for (const p of GD.pieces) for (const k of TIERS) ids.push(itemId(v.code, p.slot, k));
+  for (const v of GD.variants) for (const p of piecesOf(v)) for (const k of TIERS) ids.push(itemId(v.code, p.slot, k));
   return ids;
 }
 function oreIds() { return BAR_KEYS.map(oreId); }
 function barIds() { return BAR_KEYS.map(barId); }
-function materialIds() { return [...oreIds(), ...barIds()]; }
+function woodIds() { return BAR_KEYS.map(woodId); }
+function plankIds() { return BAR_KEYS.map(plankId); }
+function materialIds() { return [...oreIds(), ...barIds(), ...woodIds(), ...plankIds()]; }
 function planAllIds() {
   const ids = new Set();
   for (const r of ST.plan) {
-    ids.add(itemId(r.code, r.slot, r.k));
+    const v = variant(r.code) || GD.variants[0];
+    let p = piece(r.slot);
+    if (!p || (p.cat || 'plate') !== (v.cat || 'plate')) p = piecesOf(v)[0];
+    const req = matReq(v, p);
+    ids.add(itemId(r.code, p.slot, r.k));
     let k = r.k;
-    while (k) { ids.add(barId(k)); ids.add(oreId(k)); k = lowerBar(k); }
+    while (k) {
+      if (req.bars > 0 || (v && v.royal)) { ids.add(barId(k)); ids.add(oreId(k)); }
+      if (req.planks > 0) { ids.add(plankId(k)); ids.add(woodId(k)); }
+      k = lowerBar(k);
+    }
   }
   return [...ids];
 }
@@ -1293,8 +1467,9 @@ function rankGearIds() {
   const f = rankFilter;
   const ids = [];
   for (const v of GD.variants) {
+    if (f.cat && (v.cat || 'plate') !== f.cat) continue;
     if (f.variant && v.code !== f.variant) continue;
-    for (const p of GD.pieces) {
+    for (const p of piecesOf(v)) {
       if (f.piece && p.slot !== f.piece) continue;
       for (const k of TIERS) {
         if (f.tier && tv(k)[0] !== Number(f.tier)) continue;
@@ -1307,7 +1482,7 @@ function rankGearIds() {
 }
 function currentGearTabIds() {
   const g = gearFilter, ids = [];
-  for (const p of GD.pieces) if (!g.piece || g.piece === p.slot)
+  for (const p of piecesOf(g.variant)) if (!g.piece || g.piece === p.slot)
     for (const k of TIERS) if (tv(k)[0] >= Number(g.tmin)) ids.push(itemId(g.variant, p.slot, k));
   return ids;
 }
@@ -1316,7 +1491,7 @@ async function fetchVolumes(ids) {
   if (!ids || !ids.length) return toast('Nenhum item selecionado para buscar volume.');
   if (FETCHING) return toast('Já existe uma busca em andamento…');
   FETCHING = true;
-  document.querySelectorAll('#fetchAll,#fetchTab,#fetchPlan,#fetchVolumesRank,#fetchPlanVolumes,#fetchGearVolumes,#fetchGearVolumesAll,#fetchMaterialsVolume,#fetchOreVolumes,#fetchBarVolumes').forEach(b => b.disabled = true);
+  document.querySelectorAll('#fetchAll,#fetchTab,#fetchPlan,#fetchVolumesRank,#fetchPlanVolumes,#fetchGearVolumes,#fetchGearVolumesAll,#fetchMaterialsVolume,#fetchOreVolumes,#fetchBarVolumes,#fetchWoodVolumes,#fetchPlankVolumes').forEach(b => b.disabled = true);
   const locs = GD.saleLocs.join(',');
   let got = 0, done = 0;
   const chunks = chunkIds(ids, 1200);
@@ -1383,8 +1558,19 @@ function bind() {
       setQP(d.pid, d.loc, q, el.value === '' ? null : Number(el.value));
       return changed();
     }
-    if (d.plan !== undefined) { ST.plan[d.plan][d.f] = d.f === 'qty' ? Number(el.value) || 0 : el.value; return changed(); }
+    if (d.plan !== undefined) {
+      const row = ST.plan[d.plan];
+      row[d.f] = d.f === 'qty' ? Number(el.value) || 0 : el.value;
+      if (d.f === 'code') {
+        const valid = piecesOf(row.code);
+        if (valid.length && !valid.some(p => p.slot === row.slot)) {
+          row.slot = valid[0].slot;
+        }
+      }
+      return changed();
+    }
     if (d.origin) { ST.origins[d.origin] = el.value; return changed(); }
+    if (d.plankorigin) { ST.plankOrigins = ST.plankOrigins || {}; ST.plankOrigins[d.plankorigin] = el.value; return changed(); }
     if (d.cfg) {
       if (d.cfg === 'server' || d.cfg === 'materialPricing' || d.cfg === 'targetQuality') {
         ST.config[d.cfg] = el.value;
@@ -1393,8 +1579,27 @@ function bind() {
       }
       return changed();
     }
-    if (d.rf) { rankFilter[d.rf] = el.type === 'checkbox' ? el.checked : el.value; return render(); }
-    if (d.gf) { gearFilter[d.gf] = el.value; return render(); }
+    if (d.rf) {
+      rankFilter[d.rf] = el.type === 'checkbox' ? el.checked : el.value;
+      if (d.rf === 'cat') {
+        rankFilter.variant = '';
+        rankFilter.piece = '';
+      }
+      return render();
+    }
+    if (d.gf) {
+      gearFilter[d.gf] = el.value;
+      if (d.gf === 'cat') {
+        const vs = GD.variants.filter(v => !gearFilter.cat || (v.cat || 'plate') === gearFilter.cat);
+        if (vs.length && !vs.some(v => v.code === gearFilter.variant)) {
+          gearFilter.variant = vs[0].code;
+        }
+        gearFilter.piece = '';
+      } else if (d.gf === 'variant') {
+        gearFilter.piece = '';
+      }
+      return render();
+    }
     if (el.id === 'importFile' && el.files[0]) {
       el.files[0].text().then(t => { ST = JSON.parse(t); changed(); toast('Backup importado.'); }).catch(() => toast('Arquivo inválido.'));
     }
@@ -1407,6 +1612,7 @@ function bind() {
     if (t.dataset.del !== undefined) { ST.plan.splice(Number(t.dataset.del), 1); return changed(); }
     if (t.dataset.addrank) { const [code, slot, k] = t.dataset.addrank.split('|'); ST.plan.push({ code, slot, k, qty: 10 }); save(); return toast('Adicionado ao planejador (10 un.).'); }
     if (t.dataset.ptab) { priceTab = t.dataset.ptab; return render(); }
+    if (t.dataset.rtab) { refineTab = t.dataset.rtab; return render(); }
     if (t.id === 'fetchAll') return fetchPrices(allIds());
     if (t.id === 'fetchTab') return fetchPrices(tabIds());
     if (t.id === 'fetchPlan') return fetchPrices(planIds());
@@ -1417,6 +1623,8 @@ function bind() {
     if (t.id === 'fetchMaterialsVolume') return fetchVolumes(materialIds());
     if (t.id === 'fetchOreVolumes') return fetchVolumes(oreIds());
     if (t.id === 'fetchBarVolumes') return fetchVolumes(barIds());
+    if (t.id === 'fetchWoodVolumes') return fetchVolumes(woodIds());
+    if (t.id === 'fetchPlankVolumes') return fetchVolumes(plankIds());
     if (t.id === 'exportBtn') {
       const a = document.createElement('a');
       a.href = URL.createObjectURL(new Blob([JSON.stringify(ST, null, 1)], { type: 'application/json' }));
@@ -1489,7 +1697,7 @@ async function checkLiveStatus() {
 
 (async function init() {
   [GD, ST] = await Promise.all([fetch('/api/gamedata').then(r => r.json()), fetch('/api/state').then(r => r.json())]);
-  ST.prices ??= {}; ST.dates ??= {}; ST.origins ??= {}; ST.plan ??= []; ST.volumes ??= {};
+  ST.prices ??= {}; ST.dates ??= {}; ST.origins ??= {}; ST.plankOrigins ??= {}; ST.plan ??= []; ST.volumes ??= {};
   ST.qualityPrices ??= {}; ST.qualityDates ??= {}; ST.qualityAmounts ??= {}; ST.amounts ??= {};
   ST.config = {
     taxBuy: 0, taxSell: 0.065, retRefine: 0.367, retCraft: 0.248, feeRefine: 465, feeCraft: 465,
