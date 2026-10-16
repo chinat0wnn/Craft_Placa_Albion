@@ -94,8 +94,27 @@ class Handler(SimpleHTTPRequestHandler):
             host = API_HOSTS.get(q.get("server", ["west"])[0], "west")
             items = q.get("items", [""])[0]
             locs = q.get("locations", [""])[0]
+            qualities = q.get("qualities", ["1,2,3,4,5"])[0]
             api = (f"https://{host}.albion-online-data.com/api/v2/stats/prices/"
-                   f"{urllib.parse.quote(items, safe=',@_')}.json?locations={urllib.parse.quote(locs, safe=',')}&qualities=1")
+                   f"{urllib.parse.quote(items, safe=',@_')}.json?locations={urllib.parse.quote(locs, safe=',')}&qualities={urllib.parse.quote(qualities, safe=',')}")
+            try:
+                req = urllib.request.Request(api, headers={"User-Agent": "AlbionCraftLocal/1.0"})
+                with urllib.request.urlopen(req, timeout=30) as r:
+                    return self._json(json.loads(r.read().decode("utf-8")))
+            except urllib.error.HTTPError as e:
+                retry = e.headers.get("Retry-After") if e.headers else None
+                return self._json({"error": f"HTTP {e.code}: {e.reason}", "status": e.code,
+                                   "retryAfter": retry}, e.code if e.code in (429, 503) else 502)
+            except Exception as e:
+                return self._json({"error": str(e)}, 502)
+        if url.path == "/api/history":
+            q = urllib.parse.parse_qs(url.query)
+            host = API_HOSTS.get(q.get("server", ["west"])[0], "west")
+            items = q.get("items", [""])[0]
+            locs = q.get("locations", [""])[0]
+            qualities = q.get("qualities", ["1"])[0]
+            api = (f"https://{host}.albion-online-data.com/api/v2/stats/history/"
+                   f"{urllib.parse.quote(items, safe=',@_')}.json?locations={urllib.parse.quote(locs, safe=',')}&qualities={urllib.parse.quote(qualities, safe=',')}&time-scale=24")
             try:
                 req = urllib.request.Request(api, headers={"User-Agent": "AlbionCraftLocal/1.0"})
                 with urllib.request.urlopen(req, timeout=30) as r:
@@ -148,18 +167,17 @@ class Handler(SimpleHTTPRequestHandler):
                 price = (order.get("UnitPriceSilver") or 0) / 10000.0
                 if price <= 0:
                     continue
-                quality = order.get("QualityLevel", 1)
-                if quality != 1:
-                    continue
+                quality = int(order.get("QualityLevel", 1))
+                amount = int(order.get("Amount", 1))
                 auction_type = order.get("AuctionType", "")
-                key = (item_id, city)
+                key = (item_id, city, quality)
                 last_city = city
                 if auction_type == "offer":
-                    if key not in batch_offers or price < batch_offers[key]:
-                        batch_offers[key] = price
+                    if key not in batch_offers or price < batch_offers[key]["price"]:
+                        batch_offers[key] = {"price": price, "amount": amount}
                 elif auction_type == "request":
-                    if key not in batch_requests or price > batch_requests[key]:
-                        batch_requests[key] = price
+                    if key not in batch_requests or price > batch_requests[key]["price"]:
+                        batch_requests[key] = {"price": price, "amount": amount}
 
             updated_count = 0
             with lock:
@@ -167,17 +185,32 @@ class Handler(SimpleHTTPRequestHandler):
                     state = json.load(f)
                 state.setdefault("prices", {})
                 state.setdefault("dates", {})
+                state.setdefault("amounts", {})
+                state.setdefault("qualityPrices", {})
+                state.setdefault("qualityAmounts", {})
 
-                for (item_id, city), p in batch_offers.items():
+                for (item_id, city, q), data_offer in batch_offers.items():
                     if city != "Black Market":
-                        state["prices"].setdefault(item_id, {})[city] = p
-                        state["dates"].setdefault(item_id, {})[city] = now_iso
+                        p = data_offer["price"]
+                        amt = data_offer["amount"]
+                        state["qualityPrices"].setdefault(item_id, {}).setdefault(str(q), {})[city] = p
+                        state["qualityAmounts"].setdefault(item_id, {}).setdefault(str(q), {})[city] = amt
+                        if q == 1 or city not in state["prices"].get(item_id, {}):
+                            state["prices"].setdefault(item_id, {})[city] = p
+                            state["amounts"].setdefault(item_id, {})[city] = amt
+                            state["dates"].setdefault(item_id, {})[city] = now_iso
                         updated_count += 1
 
-                for (item_id, city), p in batch_requests.items():
+                for (item_id, city, q), data_req in batch_requests.items():
                     if city == "Black Market":
-                        state["prices"].setdefault(item_id, {})[city] = p
-                        state["dates"].setdefault(item_id, {})[city] = now_iso
+                        p = data_req["price"]
+                        amt = data_req["amount"]
+                        state["qualityPrices"].setdefault(item_id, {}).setdefault(str(q), {})[city] = p
+                        state["qualityAmounts"].setdefault(item_id, {}).setdefault(str(q), {})[city] = amt
+                        if q == 1 or city not in state["prices"].get(item_id, {}):
+                            state["prices"].setdefault(item_id, {})[city] = p
+                            state["amounts"].setdefault(item_id, {})[city] = amt
+                            state["dates"].setdefault(item_id, {})[city] = now_iso
                         updated_count += 1
 
                 if updated_count > 0:

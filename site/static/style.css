@@ -66,3 +66,29 @@ button.icon:hover{color:var(--red)}
 .live-badge.active{border-color:rgba(76,195,138,.5);color:var(--green)}
 .live-badge.active .live-dot{background:var(--green);box-shadow:0 0 8px rgba(76,195,138,.9);animation:live-pulse 1s infinite ease-in-out}
 @keyframes live-pulse{0%,100%{opacity:.4;transform:scale(.9)}50%{opacity:1;transform:scale(1.15)}}
+
+/* Badges de Volume e Liquidez */
+.vol-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600;white-space:nowrap}
+.vol-high{background:#173825;color:#4cc38a;border:1px solid rgba(76,195,138,0.3)}
+.vol-med{background:#3b3214;color:#f0c04b;border:1px solid rgba(240,192,75,0.3)}
+.vol-low{background:#3b2314;color:#f0854b;border:1px solid rgba(240,133,75,0.3)}
+.vol-danger{background:#3b1414;color:#ef6b6b;border:1px solid rgba(239,107,107,0.3)}
+.vol-none{background:#232735;color:var(--muted);border:1px solid var(--line)}
+.vol-num{font-weight:700}
+.vol-sub{font-size:10px;color:var(--muted);margin-left:2px}
+.badge-tip{cursor:help;border-bottom:1px dotted var(--muted)}
+
+/* Badges de Qualidade */
+.q-badge{display:inline-block;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:700;margin-right:4px;vertical-align:middle;text-transform:uppercase}
+.q-badge.q-mix{background:#2a1b3d;color:#d29bff;border:1px solid rgba(210,155,255,0.4)}
+.q-badge.q-1{background:#1f232e;color:#a0a6b8;border:1px solid var(--line)}
+.q-badge.q-2{background:#132b1f;color:#4cc38a;border:1px solid rgba(76,195,138,0.4)}
+.q-badge.q-3{background:#17283c;color:#5aa9ff;border:1px solid rgba(90,169,255,0.4)}
+.q-badge.q-4{background:#2e183c;color:#c870ff;border:1px solid rgba(200,112,255,0.4)}
+.q-badge.q-5{background:#3b2a14;color:#f0c04b;border:1px solid rgba(240,192,75,0.4)}
+
+/* Alertas de Derrapagem (Slippage) e Profundidade */
+.slippage-pill{display:inline-flex;align-items:center;gap:3px;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:600;background:#3b2314;color:#f0854b;border:1px solid rgba(240,133,75,0.4);white-space:nowrap;margin-left:4px;cursor:help}
+.slippage-banner{background:#261d15;border:1px solid rgba(240,133,75,0.5);border-radius:10px;padding:10px 14px;margin:12px 0;display:flex;align-items:center;gap:10px;font-size:13px;color:#f3caa5}
+.slippage-banner b{color:#f0854b}
+

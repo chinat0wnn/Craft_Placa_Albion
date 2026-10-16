@@ -20,25 +20,48 @@ Sistema integrado de **Refino de Minérios** e **Craft de Equipamentos de Placas
    - Cálculo exato da taxa da forja baseada no *Item Value* oficial e dedução do retorno de recursos do craft.
    - Artefatos configurados sem retorno (mecânica oficial do jogo).
 
-3. **Comparador Multi-Cidades & Mercado Negro:**
+3. **Volume de Compra Diário & Risco de Liquidez (Anti-Prata Parada):**
+   - Coleta o histórico real de compras diárias via API pública do **Albion Online Data Project** (média dos últimos 28 dias por cidade e Mercado Negro).
+   - **Indicadores visuais de giro de mercado:**
+     - 🟢 **Alto Giro (≥ 20 un/dia):** Venda rápida e garantida.
+     - 🟡 **Médio Giro (5 a 19 un/dia):** Demanda moderada.
+     - 🟠 **Baixo Giro (1 a 4.9 un/dia):** Poucas vendas diárias, produzir com cautela.
+     - 🔴 **Risco de Prata Parada (< 1 un/dia ou sem vendas recentes):** Alerta crítico para evitar gastar prata em itens que ficam semanas no mercado sem vender.
+   - **Lucro Diário Estimado (`Lucro/un × Demanda/dia`):** Mostra a prata real que o item gera no seu bolso por dia.
+   - **Tempo Estimado para Escoar o Lote no Planejador:** Calcula quantos dias levará para vender todo o lote com base no ritmo real do mercado.
+
+4. **Análise de Preço por Qualidade (Q1 a Q5 & Mix Real de Craft):**
+   - Suporte completo às 5 qualidades: **Normal (Q1), Bom (Q2), Notável (Q3), Excelente (Q4) e Obra-prima (Q5)**.
+   - **Modo ⚡ Mix Real do Craft:** Pondera as chances reais estatísticas de rolagem ao forjar (`45% Q1, 42% Q2, 11% Q3, 2% Q4`), permitindo calcular a receita verdadeira de lotes e aproveitar ofertas altas do Mercado Negro.
+   - **Comparativo interativo:** Tooltip em cada peça exibindo a cotação de cada qualidade e qual cidade paga melhor.
+   - **Consulta e edição individual** por qualidade na aba *Preços > Equipamentos*.
+
+5. **Proteção de Volume & Preço Médio (VWAP / Anti-Slippage):**
+   - Protege o artesão contra **anúncios trolls de 1 unidade** que distorcem o menor preço de mercado e iludem o cálculo de custos em compras grandes (ex.: precisar de 10.000 minérios quando só há 1 pelo preço mínimo).
+   - Calcula o **VWAP (Preço Médio Ponderado por Volume)** dos últimos 28 dias para transações reais de minérios e barras.
+   - Alertas visuais de derrapagem (`⚠️ Spot vs VWAP`) no Refino e no Planejador.
+   - Modos de compra configuráveis: **Inteligente (Anti-Slippage)**, **Preço Médio Real (VWAP)**, **Menor Oferta Spot** e **Spot + Margem (5% ou 10%)**.
+
+6. **Comparador Multi-Cidades & Mercado Negro:**
    - Preços de compra comparados nas 5 cidades reais (*Thetford, Martlock, Bridgewatch, Lymhurst, Fort Sterling*).
    - Preços de venda comparados nas 5 cidades, **Caerleon** e **Mercado Negro (Black Market)**.
 
-4. **Leitor de Mercado em Tempo Real (In-Game Packet Capture):**
+7. **Leitor de Mercado em Tempo Real (In-Game Packet Capture):**
    - Captura preços **automaticamente e em tempo real** diretamente do jogo conforme você visita os mercados das cidades e do Mercado Negro.
+   - Suporte a captura de qualidades (1 a 5) e profundidade de ordens (quantidades disponíveis).
    - **100% Seguro e em Conformidade com as Regras (TOS) da Sandbox Interactive:** Funciona por monitoramento passivo de pacotes de rede locais (via driver Npcap), **sem injetar código nem tocar na memória do cliente do jogo**.
    - Integração direta: alimenta o servidor local em `/api/ingest`, atualizando as tabelas e o ranking de lucro no navegador instantaneamente com alertas visuais.
 
-5. **Busca Automática via API Pública:**
+8. **Busca Automática via API Pública:**
    - Integração com a API pública do **Albion Online Data Project** (servidores *Américas / West*, *Europa* e *Ásia / East*).
    - Envio em lotes otimizados com pausa automática (*throttle*) e tratamento com retentativa inteligente para evitar erros de limite de requisições (`HTTP 429`).
    - Indicação visual de preços desatualizados (> 48h) e suporte a edição manual de qualquer valor.
 
-6. **Planejador & Lista de Compras:**
+9. **Planejador & Lista de Compras:**
    - Permite montar uma lista do que você deseja craftar e informa o custo total, receita esperada e lucro líquido.
    - Gera uma **Lista de Compras Consolidada** (minérios, barras prontas e artefatos necessários já descontando os retornos de recursos esperados), indicando em qual cidade comprar cada item pelo menor preço.
 
-7. **Versão Planilha Excel:**
+10. **Versão Planilha Excel:**
    - Acompanha o arquivo `Planilha_Craft_Placas.xlsx` com fórmulas matemáticas idênticas e validadas diretamente no Excel.
 
 ---
@@ -73,7 +96,16 @@ O servidor será iniciado e a página abrirá em `http://127.0.0.1:8765`. Você 
 
 ---
 
-### Opção 3: Pelo Terminal / Linha de Comando
+### Opção 3: Apenas o Leitor (Servidor Web já em execução)
+Caso já tenha iniciado o site com o `Iniciar_Site.bat`, basta dar um duplo clique em:
+```
+Iniciar_Apenas_Leitor.bat
+```
+Ele valida se o servidor local está ativo, baixa o leitor oficial se necessário e conecta os pacotes in-game diretamente à interface.
+
+---
+
+### Opção 4: Pelo Terminal / Linha de Comando
 
 1. Abra o terminal (PowerShell, CMD ou Bash) na pasta do projeto:
    ```bash
