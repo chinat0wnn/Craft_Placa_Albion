@@ -20,4 +20,5 @@ tests/
 
 # Albion Data Client logs and binary
 albiondata-client.log*
-albiondata-client.exe
+albiondata-client*.exe*
+*.bak

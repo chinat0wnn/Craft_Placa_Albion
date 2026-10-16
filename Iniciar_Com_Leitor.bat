@@ -79,8 +79,13 @@ echo Para fechar tudo, basta fechar esta janela.
 echo ===================================================================
 echo.
 
+:reader_loop
 .\albiondata-client.exe -i "http://127.0.0.1:8765/api/ingest"
-
+if errorlevel 1 (
+    echo [AVISO] O leitor encerrou inesperadamente. Reiniciando em 2 segundos...
+    timeout /t 2 /nobreak >nul
+    goto :reader_loop
+)
 pause
 exit /b 0
 

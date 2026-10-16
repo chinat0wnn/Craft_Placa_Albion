@@ -82,7 +82,7 @@ Dê um duplo clique no arquivo:
 Iniciar_Com_Leitor.bat
 ```
 - Inicia o servidor web do Albion Craft em segundo plano.
-- Inicia o leitor de pacotes passivo (`albiondata-client`).
+- Inicia o leitor de pacotes passivo (`albiondata-client`) com **sistema de watchdog e auto-recuperação**: se a rede oscilar ou houver qualquer interrupção, o leitor reinicia automaticamente.
 - Conforme você abre o mercado no Albion Online (Thetford, Fort Sterling, Caerleon, Mercado Negro, etc.), as ordens são capturadas e o site é atualizado na hora com uma notificação verde e status "Ao vivo".
 
 ---
@@ -101,7 +101,7 @@ Caso já tenha iniciado o site com o `Iniciar_Site.bat`, basta dar um duplo cliq
 ```
 Iniciar_Apenas_Leitor.bat
 ```
-Ele valida se o servidor local está ativo, baixa o leitor oficial se necessário e conecta os pacotes in-game diretamente à interface.
+Ele valida se o servidor local está ativo, baixa o leitor oficial se necessário, conta com watchdog integrado e conecta os pacotes in-game diretamente à interface.
 
 ---
 
@@ -158,6 +158,7 @@ Para encerrar o servidor, pressione `Ctrl + C` no terminal.
 ```
 Planilhas_Albion/
 ├── Iniciar_Com_Leitor.bat         # Inicialização completa (Site + Leitor em tempo real)
+├── Iniciar_Apenas_Leitor.bat      # Inicialização exclusiva do leitor (para servidor já ativo)
 ├── Iniciar_Site.bat               # Atalho para inicialização simples (somente o site)
 ├── Planilha_Craft_Placas.xlsx     # Planilha Excel completa e automatizada
 ├── site/                          # Código da aplicação web
