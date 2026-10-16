@@ -6,8 +6,9 @@ let ST = null;      // estado do usuário (preços, config, plano)
 let VIEW = 'plan';
 let priceTab = 'ore';
 let refineTab = 'bar';
-let rankFilter = { cat: '', variant: '', piece: '', tier: '', ench: '', minVol: '0', quality: 'mix', onlyPriced: true, sort: 'profitDaily' };
+let rankFilter = { cat: '', variant: '', piece: '', tier: '', ench: '', minVol: '0', quality: 'mix', onlyPriced: true, sort: 'profitDaily', sellPricing: 'spot', healthFilter: 'all' };
 let gearFilter = { cat: '', variant: 'SET1', piece: '', tmin: 4, quality: '1' };
+let histModalState = { itemId: null, loc: 'Black Market' };
 
 const QUALITIES = [
   { q: 1, name: 'Normal', short: 'Q1', weight: 0.45 },
@@ -239,15 +240,55 @@ function getBestVol(id, preferredLoc) {
   }
   return best;
 }
-function volBadge(vol, locLabel = '') {
-  if (!vol) return `<span class="vol-badge vol-none" title="Demanda ainda não consultada. Clique em 'Buscar volumes'.">— <span class="vol-sub">s/ dados</span></span>`;
+function itemIconUrl(id, quality = 1) {
+  if (!id) return '';
+  return `https://render.albiononline.com/v1/item/${encodeURIComponent(id)}.png?quality=${quality || 1}`;
+}
+
+function getItemDisplayInfo(id) {
+  if (!id) return { name: 'Item', tier: '', sub: '', icon: '' };
+  for (const k of BAR_KEYS) {
+    if (oreId(k) === id) return { name: `Minério T${k}`, tier: `T${k}`, sub: 'Matéria-prima', icon: itemIconUrl(id) };
+    if (barId(k) === id) return { name: `Barra de Metal T${k}`, tier: `T${k}`, sub: 'Material Refinado', icon: itemIconUrl(id) };
+    if (woodId(k) === id) return { name: `Madeira T${k}`, tier: `T${k}`, sub: 'Matéria-prima', icon: itemIconUrl(id) };
+    if (plankId(k) === id) return { name: `Tábua T${k}`, tier: `T${k}`, sub: 'Material Refinado', icon: itemIconUrl(id) };
+  }
+  if (GD.royal) {
+    for (const t of [4, 5, 6, 7, 8]) {
+      const s = GD.royal.sigils[t];
+      if (s && s.id === id) return { name: `Emblema Real (${s.name})`, tier: `T${t}`, sub: 'Emblema Real', icon: itemIconUrl(id) };
+    }
+  }
+  for (const [artKey, art] of Object.entries(GD.artifacts || {})) {
+    if (art.id === id) return { name: art.name, tier: `T${art.id[1] || 4}`, sub: 'Artefato', icon: itemIconUrl(id) };
+  }
+  for (const v of GD.variants) {
+    for (const p of piecesOf(v)) {
+      for (const k of TIERS) {
+        if (itemId(v.code, p.slot, k) === id) {
+          return {
+            name: `${v.name} · ${p.name}`,
+            tier: `T${k}`,
+            sub: `${v.cat === 'bow' ? 'Arco' : v.cat === 'crossbow' ? 'Besta' : 'Armadura de Placas'} · ${p.name}`,
+            icon: itemIconUrl(id)
+          };
+        }
+      }
+    }
+  }
+  return { name: id, tier: '', sub: 'Item de Mercado', icon: itemIconUrl(id) };
+}
+
+function volBadge(vol, locLabel = '', itemId = '', loc = '') {
+  const dataAttr = itemId ? ` data-hist-id="${esc(itemId)}" data-hist-loc="${esc(loc || '')}" style="cursor:pointer"` : '';
+  if (!vol) return `<span class="vol-badge vol-none" ${dataAttr} title="Demanda ainda não consultada. Clique para ver o histórico.">— <span class="vol-sub">s/ dados</span></span>`;
   const d = vol.daily !== undefined ? vol.daily : 0;
-  const tip = `${locLabel ? locLabel + ': ' : ''}${fmt(d, 1)} peças/dia (Total 28d: ${fmt(vol.total28 || 0)} un)${vol.vwap ? ' · Preço médio (VWAP): ' + fmt(vol.vwap) + 's' : ''}${vol.lastDate ? ' · Última: ' + vol.lastDate : ''}`;
-  if (d >= 20) return `<span class="vol-badge vol-high badge-tip" title="${esc(tip)}">🟢 <span class="vol-num">${fmt(d, 1)}</span><span class="vol-sub">/dia</span></span>`;
-  if (d >= 5) return `<span class="vol-badge vol-med badge-tip" title="${esc(tip)}">🟡 <span class="vol-num">${fmt(d, 1)}</span><span class="vol-sub">/dia</span></span>`;
-  if (d >= 1) return `<span class="vol-badge vol-low badge-tip" title="${esc(tip)}">🟠 <span class="vol-num">${fmt(d, 1)}</span><span class="vol-sub">/dia</span></span>`;
-  if (d > 0) return `<span class="vol-badge vol-danger badge-tip" title="${esc(tip)}">🔴 <span class="vol-num">${fmt(d, 1)}</span><span class="vol-sub">/dia (lento)</span></span>`;
-  return `<span class="vol-badge vol-danger badge-tip" title="${esc(tip)}">⛔ <span class="vol-num">0</span><span class="vol-sub">/dia (parado)</span></span>`;
+  const tip = `${locLabel ? locLabel + ': ' : ''}${fmt(d, 1)} peças/dia (Total 28d: ${fmt(vol.total28 || 0)} un)${vol.vwap ? ' · Preço médio (VWAP): ' + fmt(vol.vwap) + 's' : ''}${vol.lastDate ? ' · Última: ' + vol.lastDate : ''} — Clique para ver o gráfico e histórico`;
+  if (d >= 20) return `<span class="vol-badge vol-high badge-tip" ${dataAttr} title="${esc(tip)}">🟢 <span class="vol-num">${fmt(d, 1)}</span><span class="vol-sub">/dia</span></span>`;
+  if (d >= 5) return `<span class="vol-badge vol-med badge-tip" ${dataAttr} title="${esc(tip)}">🟡 <span class="vol-num">${fmt(d, 1)}</span><span class="vol-sub">/dia</span></span>`;
+  if (d >= 1) return `<span class="vol-badge vol-low badge-tip" ${dataAttr} title="${esc(tip)}">🟠 <span class="vol-num">${fmt(d, 1)}</span><span class="vol-sub">/dia</span></span>`;
+  if (d > 0) return `<span class="vol-badge vol-danger badge-tip" ${dataAttr} title="${esc(tip)}">🔴 <span class="vol-num">${fmt(d, 1)}</span><span class="vol-sub">/dia (lento)</span></span>`;
+  return `<span class="vol-badge vol-danger badge-tip" ${dataAttr} title="${esc(tip)}">⛔ <span class="vol-num">0</span><span class="vol-sub">/dia (parado)</span></span>`;
 }
 function riskBadge(vol) {
   if (!vol) return `<span class="muted">—</span>`;
@@ -262,21 +303,34 @@ function calcVolumeSummary(pts) {
   const now = Date.now();
   let total28 = 0, total7 = 0, lastDate = null, latestTs = 0;
   let silver28 = 0, silver7 = 0;
+  let minPrice = Infinity, maxPrice = 0;
+  const validPts = [];
   for (const pt of pts) {
     const ptTs = new Date(pt.timestamp + (pt.timestamp.endsWith('Z') ? '' : 'Z')).getTime();
     if (isNaN(ptTs)) continue;
-    const diffDays = (now - ptTs) / (1000 * 3600 * 24);
     const count = pt.item_count || 0;
     const avg = pt.avg_price || 0;
+    if (count <= 0 || avg <= 0) continue;
+    validPts.push({ ts: ptTs, date: pt.timestamp.slice(0, 10), count, avg: Math.round(avg) });
+  }
+  validPts.sort((a, b) => a.ts - b.ts);
+  const series28 = [];
+  const prices28 = [];
+  for (const pt of validPts) {
+    const diffDays = (now - pt.ts) / (1000 * 3600 * 24);
     if (diffDays <= 28) {
-      total28 += count;
-      silver28 += count * avg;
+      total28 += pt.count;
+      silver28 += pt.count * pt.avg;
+      if (pt.avg < minPrice) minPrice = pt.avg;
+      if (pt.avg > maxPrice) maxPrice = pt.avg;
+      prices28.push(pt.avg);
+      series28.push({ date: pt.date, count: pt.count, avg: pt.avg });
     }
     if (diffDays <= 7) {
-      total7 += count;
-      silver7 += count * avg;
+      total7 += pt.count;
+      silver7 += pt.count * pt.avg;
     }
-    if (ptTs > latestTs) { latestTs = ptTs; lastDate = pt.timestamp.slice(0, 10); }
+    if (pt.ts > latestTs) { latestTs = pt.ts; lastDate = pt.date; }
   }
   const daysSinceLast = latestTs ? (now - latestTs) / (1000 * 3600 * 24) : 999;
   let daily = 0;
@@ -287,7 +341,145 @@ function calcVolumeSummary(pts) {
   const vwap28 = total28 > 0 ? Math.round(silver28 / total28) : null;
   const vwap7 = total7 > 0 ? Math.round(silver7 / total7) : null;
   const vwap = vwap7 || vwap28;
-  return { daily, total28, total7, lastDate, daysSinceLast: Math.round(daysSinceLast), vwap, vwap28, vwap7 };
+
+  prices28.sort((a, b) => a - b);
+  let medianPrice = null;
+  if (prices28.length > 0) {
+    const mid = Math.floor(prices28.length / 2);
+    medianPrice = prices28.length % 2 !== 0 ? prices28[mid] : Math.round((prices28[mid - 1] + prices28[mid]) / 2);
+  }
+
+  const volatility = (minPrice < Infinity && maxPrice > 0 && vwap > 0)
+    ? Math.round(((maxPrice - minPrice) / vwap) * 100)
+    : 0;
+
+  let trend = 'stable';
+  const totalPrior = total28 - total7;
+  const silverPrior = silver28 - silver7;
+  const vwapPrior = totalPrior > 0 ? (silverPrior / totalPrior) : null;
+  if (vwap7 && vwapPrior) {
+    if (vwap7 >= vwapPrior * 1.08) trend = 'up';
+    else if (vwap7 <= vwapPrior * 0.92) trend = 'down';
+  } else if (vwap7 && vwap28) {
+    if (vwap7 >= vwap28 * 1.08) trend = 'up';
+    else if (vwap7 <= vwap28 * 0.92) trend = 'down';
+  }
+
+  return {
+    daily, total28, total7, lastDate, daysSinceLast: Math.round(daysSinceLast),
+    vwap, vwap28, vwap7,
+    minPrice: minPrice < Infinity ? minPrice : null,
+    maxPrice: maxPrice > 0 ? maxPrice : null,
+    medianPrice, volatility, trend,
+    series: series28
+  };
+}
+
+function analyzePriceHealth(spotPrice, vol) {
+  if (!spotPrice || spotPrice <= 0) {
+    return {
+      status: 'none',
+      label: 'Sem preço',
+      badgeClass: 'health-nodata',
+      icon: '⚪',
+      title: 'Sem oferta de mercado registrada',
+      diffPct: null,
+      vwap: null,
+      desc: 'Este item ainda não possui ordem de venda ou compra registrada nas cidades.'
+    };
+  }
+  if (!vol || (!vol.vwap && !vol.daily && !vol.total28)) {
+    return {
+      status: 'nodata',
+      label: 'Sem histórico',
+      badgeClass: 'health-nodata',
+      icon: '❓',
+      title: 'Histórico de vendas ainda não consultado',
+      diffPct: null,
+      vwap: null,
+      desc: 'Ainda não foram baixados dados de volume ou histórico para esta cidade/item. Clique no botão de buscar volumes para carregar o histórico do Albion Data Project.'
+    };
+  }
+
+  const vwap = vol.vwap || vol.vwap28 || vol.vwap7 || 0;
+  const daily = vol.daily !== undefined ? vol.daily : 0;
+  const daysSince = vol.daysSinceLast !== undefined ? vol.daysSinceLast : 999;
+
+  if (daily === 0 || daysSince > 21) {
+    return {
+      status: 'nosales',
+      label: 'Sem Vendas',
+      badgeClass: 'health-nosales',
+      icon: '⛔',
+      title: 'Sem vendas recentes / Risco de Prata Parada',
+      diffPct: vwap ? Math.round(((spotPrice - vwap) / vwap) * 100) : null,
+      vwap, daily, daysSince,
+      desc: `Este item teve pouca ou nenhuma venda nos últimos 28 dias (${fmt(daily, 1)} un/dia; última venda registrada há ${daysSince} dias). Mesmo que a margem pareça atraente na tela, há grande risco de sua prata ficar presa sem compradores no mercado.`
+    };
+  }
+
+  if (vwap > 0) {
+    const diffPct = Math.round(((spotPrice - vwap) / vwap) * 100);
+    if (diffPct >= 25) {
+      return {
+        status: 'inflated',
+        label: `Anormal (+${diffPct}%)`,
+        badgeClass: 'health-inflated',
+        icon: '⚠️',
+        title: `Preço Anormalmente Alto (+${diffPct}% vs VWAP)`,
+        diffPct, vwap, daily, daysSince,
+        desc: `A menor oferta de venda atual (${fmt(spotPrice)}s) está +${diffPct}% acima do Preço Médio Ponderado Histórico (VWAP: ${fmt(vwap)}s). Isso geralmente é causado por mercado esvaziado ou anúncio troll de 1 unidade. Cuidado: vender a esse valor pode demorar muito tempo ou nunca ser comprado!`
+      };
+    }
+    if (diffPct <= -25) {
+      return {
+        status: 'dump',
+        label: `Abaixo (${diffPct}%)`,
+        badgeClass: 'health-dump',
+        icon: '📉',
+        title: `Preço Abaixo da Média Histórica (${diffPct}% vs VWAP)`,
+        diffPct, vwap, daily, daysSince,
+        desc: `A oferta atual (${fmt(spotPrice)}s) está ${Math.abs(diffPct)}% abaixo do preço médio real histórico (VWAP: ${fmt(vwap)}s). Pode ser queima de estoque temporária (dump). Para craft, você pode obter lucros maiores se aguardar o preço voltar à média.`
+      };
+    }
+    if (Math.abs(diffPct) <= 12 && daysSince <= 7) {
+      return {
+        status: 'stable',
+        label: `Estável (${diffPct >= 0 ? '+' : ''}${diffPct}%)`,
+        badgeClass: 'health-stable',
+        icon: '🟢',
+        title: `Preço Confiável e Saudável (${diffPct >= 0 ? '+' : ''}${diffPct}% do VWAP)`,
+        diffPct, vwap, daily, daysSince,
+        desc: `O preço atual de ${fmt(spotPrice)}s está perfeitamente alinhado com o Preço Médio Histórico de ${fmt(vwap)}s (variação de apenas ${diffPct}%). Há vendas regulares ativas (${fmt(daily, 1)} un/dia, última há ${daysSince}d). O lucro estimado aqui é sólido e confiável!`
+      };
+    }
+    return {
+      status: 'moderate',
+      label: `Oscilando (${diffPct >= 0 ? '+' : ''}${diffPct}%)`,
+      badgeClass: 'health-moderate',
+      icon: '🟡',
+      title: `Preço com Variação Moderada (${diffPct >= 0 ? '+' : ''}${diffPct}% vs VWAP)`,
+      diffPct, vwap, daily, daysSince,
+      desc: `O preço atual varia moderadamente em relação ao histórico (VWAP: ${fmt(vwap)}s; variação de ${diffPct}%). Acompanhe o fluxo diário de vendas (${fmt(daily, 1)} un/dia) para planejar o tamanho do lote.`
+    };
+  }
+
+  return {
+    status: 'nodata',
+    label: 'Sem Histórico',
+    badgeClass: 'health-nodata',
+    icon: '❓',
+    title: 'Histórico insuficiente',
+    diffPct: null,
+    vwap: null,
+    desc: 'Volume registrado mas sem dados suficientes de valor ponderado.'
+  };
+}
+
+function priceHealthBadge(spotPrice, vol, itemId = '', loc = '') {
+  const h = analyzePriceHealth(spotPrice, vol);
+  const dataAttrs = itemId ? `data-hist-id="${esc(itemId)}" data-hist-loc="${esc(loc)}"` : '';
+  return `<span class="health-pill ${h.badgeClass}" ${dataAttrs} title="${esc(h.title + ' — Clique para ver o gráfico e histórico completo')}">${h.icon} ${h.label}</span>`;
 }
 
 /* ---------------- compra de materiais e proteção de volume ---------------- */
@@ -432,7 +624,7 @@ function computePlanks() {
   return computeRefinedChain(woodId, plankId, WOOD_QTY, ST.plankOrigins || {});
 }
 
-function computeBaseItem(bars, code, slot, k, targetQ = null, planks = null) {
+function computeBaseItem(bars, code, slot, k, targetQ = null, planks = null, sellMode = null) {
   const c = ST.config, v = variant(code) || GD.variants[0];
   let p = piece(slot);
   if (!p || (p.cat || 'plate') !== (v.cat || 'plate')) {
@@ -457,22 +649,38 @@ function computeBaseItem(bars, code, slot, k, targetQ = null, planks = null) {
   const itId = itemId(code, slot, k);
   const qMode = targetQ || rankFilter.quality || ST.config.targetQuality || 'mix';
   const sell = bestSellQuality(itId, qMode);
-  const revenue = sell ? sell.price * (1 - c.taxSell) : null;
-  const profit = (cost !== null && revenue !== null) ? revenue - cost : null;
+  const spotPrice = sell ? sell.price : null;
   const vol = sell ? getVol(itId, sell.loc) : getBestVol(itId);
+  const health = analyzePriceHealth(spotPrice, vol);
+  const sellPricingMode = sellMode || rankFilter.sellPricing || 'spot';
+
+  let effectiveSellPrice = spotPrice;
+  if (vol && vol.vwap > 0) {
+    if (sellPricingMode === 'vwap') {
+      effectiveSellPrice = vol.vwap;
+    } else if (sellPricingMode === 'safe') {
+      effectiveSellPrice = spotPrice ? Math.min(spotPrice, vol.vwap) : vol.vwap;
+    } else if (sellPricingMode === 'smart' && health.status === 'inflated') {
+      effectiveSellPrice = vol.vwap;
+    }
+  }
+
+  const revenue = effectiveSellPrice ? effectiveSellPrice * (1 - c.taxSell) : null;
+  const profit = (cost !== null && revenue !== null) ? revenue - cost : null;
   const dailyVol = vol ? (vol.daily !== undefined ? vol.daily : 0) : null;
   const profitDaily = (dailyVol !== null) ? ((profit !== null && profit > 0) ? profit * dailyVol : (profit !== null && profit < 0 ? profit : 0)) : profit;
   return {
     id: itId, code, slot, k, t, v, p,
     nBars: req.bars, nPlanks: req.planks, metalCost, planksCost,
-    art, artBuy, barsCost, artCost, iv, fee, cost, sell, revenue, profit,
-    vol, dailyVol, profitDaily,
+    art, artBuy, barsCost, artCost, iv, fee, cost, sell,
+    spotPrice, effectiveSellPrice, revenue, profit,
+    vol, dailyVol, profitDaily, health,
     margin: profit !== null && cost ? profit / cost : null,
     name: `${v.name} · ${p.name} · T${k}`,
   };
 }
 
-function computeItem(bars, code, slot, k, targetQ = null, planks = null) {
+function computeItem(bars, code, slot, k, targetQ = null, planks = null, sellMode = null) {
   const c = ST.config, v = variant(code) || GD.variants[0];
   let p = piece(slot);
   if (!p || (p.cat || 'plate') !== (v.cat || 'plate')) {
@@ -489,12 +697,10 @@ function computeItem(bars, code, slot, k, targetQ = null, planks = null) {
     const sigilBuy = sigilInfo ? getMaterialBuy(sigilInfo.id, sigilQty) : null;
     const sigilCost = (sigilBuy && sigilQty > 0) ? sigilQty * sigilBuy.price * (1 + c.taxBuy) : null;
 
-    // Peça base: Soldado (SET1), Cavaleiro (SET2) ou Guardião (SET3).
-    // Escolhe a rota mais econômica: craftar a partir de barras ou comprar pronta no mercado.
     let bestBase = null;
     for (const bCode of roy.baseSets) {
       const bV = variant(bCode);
-      const bIt = computeBaseItem(bars, bCode, slot, k, targetQ, planks);
+      const bIt = computeBaseItem(bars, bCode, slot, k, targetQ, planks, sellMode);
       const bBuy = getMaterialBuy(itemId(bCode, slot, k), 1);
       const bBuyCost = bBuy ? bBuy.price * (1 + c.taxBuy) : null;
 
@@ -511,13 +717,28 @@ function computeItem(bars, code, slot, k, targetQ = null, planks = null) {
     }
 
     const baseCost = bestBase ? bestBase.cost : null;
-    const fee = 0; // Taxa de forja para conversão real é 0 prata
+    const fee = 0;
     const cost = (baseCost !== null && sigilCost !== null) ? baseCost + sigilCost + fee : null;
     const itId = itemId(code, slot, k);
     const sell = bestSellQuality(itId, qMode);
-    const revenue = sell ? sell.price * (1 - c.taxSell) : null;
-    const profit = (cost !== null && revenue !== null) ? revenue - cost : null;
+    const spotPrice = sell ? sell.price : null;
     const vol = sell ? getVol(itId, sell.loc) : getBestVol(itId);
+    const health = analyzePriceHealth(spotPrice, vol);
+    const sellPricingMode = sellMode || rankFilter.sellPricing || 'spot';
+
+    let effectiveSellPrice = spotPrice;
+    if (vol && vol.vwap > 0) {
+      if (sellPricingMode === 'vwap') {
+        effectiveSellPrice = vol.vwap;
+      } else if (sellPricingMode === 'safe') {
+        effectiveSellPrice = spotPrice ? Math.min(spotPrice, vol.vwap) : vol.vwap;
+      } else if (sellPricingMode === 'smart' && health.status === 'inflated') {
+        effectiveSellPrice = vol.vwap;
+      }
+    }
+
+    const revenue = effectiveSellPrice ? effectiveSellPrice * (1 - c.taxSell) : null;
+    const profit = (cost !== null && revenue !== null) ? revenue - cost : null;
     const dailyVol = vol ? (vol.daily !== undefined ? vol.daily : 0) : null;
     const profitDaily = (dailyVol !== null) ? ((profit !== null && profit > 0) ? profit * dailyVol : (profit !== null && profit < 0 ? profit : 0)) : profit;
 
@@ -531,14 +752,15 @@ function computeItem(bars, code, slot, k, targetQ = null, planks = null) {
       artCost: sigilCost,
       art: sigilInfo ? { id: sigilInfo.id, name: `${sigilQty}x ${sigilInfo.name}` } : null,
       artBuy: sigilBuy,
-      iv: 0, fee, cost, sell, revenue, profit,
-      vol, dailyVol, profitDaily,
+      iv: 0, fee, cost, sell,
+      spotPrice, effectiveSellPrice, revenue, profit,
+      vol, dailyVol, profitDaily, health,
       margin: profit !== null && cost ? profit / cost : null,
       name: `${v.name} · ${p.name} · T${k}`,
     };
   }
 
-  return computeBaseItem(bars, code, slot, k, targetQ, planks);
+  return computeBaseItem(bars, code, slot, k, targetQ, planks, sellMode);
 }
 
 function decomposeChainDemands(directMap, chainMap, rawIdFn, refIdFn, rawName, refName, missing) {
@@ -850,10 +1072,11 @@ function viewPlan() {
       <td><b>${fmt(r.it.cost)}</b></td>
       <td class="best">${sellHtml}</td>
       <td class="l">${r.it.sell ? locName(r.it.sell.loc) : ''}</td>
+      <td>${priceHealthBadge(r.it.spotPrice, r.it.vol, r.it.id, r.it.sell ? r.it.sell.loc : '')}</td>
       <td class="${cls(r.it.profit)}">${fmt(r.it.profit)}</td>
       <td class="${cls(r.it.margin)}">${pct(r.it.margin)}</td>
       <td class="${cls(r.totalProfit)}"><b>${fmt(r.totalProfit)}</b></td>
-      <td>${volBadge(r.it.vol, r.it.sell ? locName(r.it.sell.loc) : '')}</td>
+      <td>${volBadge(r.it.vol, r.it.sell ? locName(r.it.sell.loc) : '', r.it.id, r.it.sell ? r.it.sell.loc : '')}</td>
       <td>${timeStr}</td>
       <td><button class="icon" data-del="${i}" title="Remover">✕</button></td>
     </tr>`;
@@ -883,10 +1106,10 @@ function viewPlan() {
   ${P.missing.length ? `<div class="card" style="border-color:#6b5a2a">⚠️ Faltam preços para: <b>${esc([...new Set(P.missing)].join(', '))}</b> — preencha na aba Preços ou use “Buscar preços”.</div>` : ''}
   <div class="tablewrap"><table>
     <tr><th class="l">Item / Variante</th><th class="l">Peça / Tipo</th><th class="l">Tier</th><th>Qtd</th><th title="Custo líquido de Barras e/ou Tábuas (ou Peça Base para Reais)">Materiais / Base</th><th>Artefato / Emblema</th><th>Taxa estação</th>
-    <th>Custo / peça</th><th>Melhor venda</th><th class="l">Local</th><th>Lucro / peça</th><th>Margem</th><th>Lucro total</th>
+    <th>Custo / peça</th><th>Melhor venda</th><th class="l">Local</th><th>Saúde</th><th>Lucro / peça</th><th>Margem</th><th>Lucro total</th>
     <th title="Volume de compra diário no mercado de venda (média últimos 28 dias)">Demanda / dia</th>
     <th title="Tempo estimado para escoar o lote com base na demanda diária">Tempo p/ vender</th><th></th></tr>
-    ${rows || '<tr><td colspan="16" class="empty">Nenhum item planejado. Clique em “Adicionar item” ou use o Ranking.</td></tr>'}
+    ${rows || '<tr><td colspan="17" class="empty">Nenhum item planejado. Clique em “Adicionar item” ou use o Ranking.</td></tr>'}
   </table></div>
   <div class="toolbar">
     <button class="btn" id="addPlan">+ Adicionar item</button>
@@ -971,6 +1194,9 @@ function viewRank() {
         const it = computeItem(bars, v.code, p.slot, k, null, planks);
         if (f.onlyPriced && it.profit === null) continue;
         if (f.minVol && Number(f.minVol) > 0 && (it.dailyVol === null || it.dailyVol < Number(f.minVol))) continue;
+        if (f.healthFilter === 'stable_only' && it.health.status !== 'stable') continue;
+        if (f.healthFilter === 'no_inflated' && it.health.status === 'inflated') continue;
+        if (f.healthFilter === 'with_sales' && (it.health.status === 'nosales' || !it.dailyVol)) continue;
         items.push(it);
       }
     }
@@ -984,17 +1210,23 @@ function viewRank() {
   }[f.sort] || 'profitDaily';
   items.sort((a, b) => (b[key] ?? -Infinity) - (a[key] ?? -Infinity));
   const body = items.slice(0, 600).map(it => {
+    const isVwapUsed = it.effectiveSellPrice !== null && it.effectiveSellPrice !== it.spotPrice;
+    const sellPriceDisplay = isVwapUsed
+      ? `${fmt(it.effectiveSellPrice)} <span class="muted" style="font-size:10px" title="Preço de venda ajustado por ${f.sellPricing} (Spot original: ${fmt(it.spotPrice)}s)">(VWAP)</span>`
+      : fmt(it.spotPrice);
+
     const sellHtml = it.sell ? `
       <span class="q-badge q-${it.sell.quality || '1'}" title="${esc(it.sell.qualityName || '')}">${it.sell.qualityLabel || 'Q1'}</span>
-      <span class="badge-tip" title="${esc(formatQualityTooltip(it.sell.breakdown, it.sell.price, it.sell.qualityLabel))}">${fmt(it.sell.price)}</span>
+      <span class="badge-tip" title="${esc(formatQualityTooltip(it.sell.breakdown, it.spotPrice, it.sell.qualityLabel))}">${sellPriceDisplay}</span>
     ` : '—';
     return `
     <tr><td class="l">${esc(it.v.name)}</td><td class="l">${it.p.name}</td><td class="l">T${it.k}</td>
     <td><span class="badge-tip" title="${esc(matBreakdownTip(it))}">${fmt(it.barsCost)}</span></td><td>${it.art ? fmt(it.artCost) : '—'}</td><td class="l muted">${it.art ? esc(it.art.name) + (it.artBuy ? ' · ' + it.artBuy.loc : '') : ''}</td>
     <td>${fmt(it.fee)}</td><td><b>${fmt(it.cost)}</b></td>
     <td class="best">${sellHtml}</td><td class="l">${it.sell ? locName(it.sell.loc) : ''}</td>
+    <td>${priceHealthBadge(it.spotPrice, it.vol, it.id, it.sell ? it.sell.loc : '')}</td>
     <td class="${cls(it.profit)}"><b>${fmt(it.profit)}</b></td><td class="${cls(it.margin)}">${pct(it.margin)}</td>
-    <td>${volBadge(it.vol, it.sell ? locName(it.sell.loc) : '')}</td>
+    <td>${volBadge(it.vol, it.sell ? locName(it.sell.loc) : '', it.id, it.sell ? it.sell.loc : '')}</td>
     <td class="${(it.profitDaily && it.profitDaily > 0) ? 'pos' : ''}"><b>${it.profitDaily !== null ? (it.profitDaily > 0 ? '+' : '') + fmt(it.profitDaily) : '—'}</b></td>
     <td>${riskBadge(it.vol)}</td>
     <td><button class="ghost" data-addrank="${it.code}|${it.slot}|${it.k}">+ planejar</button></td></tr>`;
@@ -1016,6 +1248,18 @@ function viewRank() {
       ${opt('4', 'Q4 · Excelente', f.quality)}
       ${opt('5', 'Q5 · Obra-prima', f.quality)}
       ${opt('best', '★ Maior Preço (Qualquer Qualidade)', f.quality)}
+    </select></label>
+    <label>Base Preço Venda<select data-rf="sellPricing">
+      ${opt('spot', '⚡ Mercado Atual (Spot - Menor Sell/Maior Buy)', f.sellPricing)}
+      ${opt('vwap', '📊 Preço Médio Histórico (VWAP - Anti-Troll)', f.sellPricing)}
+      ${opt('safe', '🛡️ Mais Seguro (Menor entre Spot e VWAP)', f.sellPricing)}
+      ${opt('smart', '💡 Inteligente (Usa VWAP se Preço For Inflado)', f.sellPricing)}
+    </select></label>
+    <label>Saúde do Preço<select data-rf="healthFilter">
+      ${opt('all', 'Todas as saúdes', f.healthFilter)}
+      ${opt('stable_only', '🟢 Apenas Estáveis & Confiáveis', f.healthFilter)}
+      ${opt('no_inflated', '🛡️ Ocultar Preços Anormais / Inflados', f.healthFilter)}
+      ${opt('with_sales', '⚡ Apenas com Vendas Ativas (Sem Mercado Parado)', f.healthFilter)}
     </select></label>
     <label>Modo Compra Materiais<select data-cfg="materialPricing">
       ${opt('smart', '🛡️ Inteligente (Anti-Fake/Slippage)', ST.config.materialPricing)}
@@ -1044,11 +1288,11 @@ function viewRank() {
   </div>
   <div class="tablewrap"><table>
     <tr><th class="l">Item / Variante</th><th class="l">Peça / Tipo</th><th class="l">Tier</th><th title="Custo líquido de Barras e/ou Tábuas após retorno">Materiais (líq.)</th><th>Artefato</th><th class="l">Artefato / cidade</th>
-    <th>Taxa</th><th>Custo</th><th>Melhor venda</th><th class="l">Local</th><th>Lucro / un.</th><th>Margem</th>
+    <th>Taxa</th><th>Custo</th><th>Melhor venda</th><th class="l">Local</th><th>Saúde Preço</th><th>Lucro / un.</th><th>Margem</th>
     <th title="Volume de compra diário no mercado de venda (média últimos 28 dias)">Demanda / dia</th>
     <th title="Lucro diário estimado = Lucro unitário × Volume diário">Lucro / dia est.</th>
     <th title="Classificação de liquidez e risco de prata parada">Giro / Risco</th><th></th></tr>
-    ${body || '<tr><td colspan="16" class="empty">Nenhum item encontrado com os filtros atuais. Busque preços/volumes ou ajuste os filtros.</td></tr>'}
+    ${body || '<tr><td colspan="17" class="empty">Nenhum item encontrado com os filtros atuais. Busque preços/volumes ou ajuste os filtros.</td></tr>'}
   </table></div>`;
 }
 
@@ -1235,7 +1479,7 @@ function viewPrices() {
       </select></label>
       <button class="ghost" id="fetchGearVolumes" style="margin-top:14px">📊 Buscar volumes (desta seleção)</button>
     </div>
-    ${priceTable(rows, GD.saleLocs, '<th>Demanda / dia</th>', r => `<td>${volBadge(getBestVol(r.id))}</td>`, curQ)}`;
+    ${priceTable(rows, GD.saleLocs, '<th>Demanda / dia</th><th>Saúde / Histórico</th>', r => `<td>${volBadge(getBestVol(r.id), '', r.id)}</td><td>${priceHealthBadge(bestSellForQuality(r.id, curQ)?.price, getBestVol(r.id), r.id)}</td>`, curQ)}`;
   }
   const last = ST.lastFetch ? new Date(ST.lastFetch).toLocaleString('pt-BR') : 'nunca';
   return `
@@ -1542,6 +1786,291 @@ async function fetchVolumes(ids) {
   }
 }
 
+/* ---------------- modal de histórico e análise ---------------- */
+function renderHistorySvg(series, spotPrice, vwap) {
+  if (!series || !series.length) {
+    return `<div class="empty">Nenhum dado diário registrado nos últimos 28 dias.</div>`;
+  }
+
+  const svgW = 760, svgH = 185;
+  const padL = 60, padR = 40, padT = 20, padB = 30;
+  const plotW = svgW - padL - padR;
+  const plotH = svgH - padT - padB;
+
+  const allPrices = series.map(s => s.avg);
+  if (spotPrice && spotPrice > 0) allPrices.push(spotPrice);
+  if (vwap && vwap > 0) allPrices.push(vwap);
+
+  const minP = Math.min(...allPrices);
+  const maxP = Math.max(...allPrices);
+  const pDiff = (maxP - minP) || (minP * 0.1) || 100;
+  const yMin = Math.max(0, Math.floor(minP - pDiff * 0.12));
+  const yMax = Math.ceil(maxP + pDiff * 0.12);
+
+  const maxVol = Math.max(...series.map(s => s.count), 1);
+
+  const getYPrice = p => padT + plotH - ((p - yMin) / (yMax - yMin || 1)) * plotH;
+  const getX = idx => series.length === 1 ? padL + plotW / 2 : padL + (idx / (series.length - 1)) * plotW;
+  const getBarH = v => (v / maxVol) * (plotH * 0.45);
+
+  let gridLines = '';
+  const nGrid = 4;
+  for (let i = 0; i <= nGrid; i++) {
+    const val = yMin + ((yMax - yMin) / nGrid) * i;
+    const y = getYPrice(val);
+    gridLines += `<line x1="${padL}" y1="${y}" x2="${padL + plotW}" y2="${y}" stroke="#262d3d" stroke-dasharray="3,3" stroke-width="1"/>`;
+    gridLines += `<text x="${padL - 8}" y="${y + 4}" fill="#788299" font-size="10" text-anchor="end">${fmt(Math.round(val))}</text>`;
+  }
+
+  let volBars = '';
+  const barW = Math.max(4, Math.min(20, (plotW / series.length) * 0.65));
+  series.forEach((s, i) => {
+    const x = getX(i) - barW / 2;
+    const h = Math.max(2, getBarH(s.count));
+    const y = padT + plotH - h;
+    volBars += `<rect x="${x}" y="${y}" width="${barW}" height="${h}" fill="#335073" rx="2" opacity="0.75"><title>${s.date}: ${fmt(s.count)} un. vendidas</title></rect>`;
+  });
+
+  let linePoints = [];
+  let dots = '';
+  series.forEach((s, i) => {
+    const x = getX(i);
+    const y = getYPrice(s.avg);
+    linePoints.push(`${x.toFixed(1)},${y.toFixed(1)}`);
+    dots += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.5" fill="#4cc38a" stroke="#151821" stroke-width="1.5"><title>${s.date}: Preço Médio ${fmt(s.avg)}s (${fmt(s.count)} un)</title></circle>`;
+  });
+
+  const polyline = `<polyline points="${linePoints.join(' ')}" fill="none" stroke="#4cc38a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>`;
+
+  let refLines = '';
+  if (vwap && vwap >= yMin && vwap <= yMax) {
+    const yV = getYPrice(vwap);
+    refLines += `<line x1="${padL}" y1="${yV}" x2="${padL + plotW}" y2="${yV}" stroke="#f0c04b" stroke-dasharray="4,4" stroke-width="1.5"/>`;
+    refLines += `<text x="${padL + plotW + 4}" y="${yV + 3}" fill="#f0c04b" font-size="10" font-weight="bold">VWAP ${fmt(vwap)}</text>`;
+  }
+
+  if (spotPrice && spotPrice >= yMin && spotPrice <= yMax) {
+    const yS = getYPrice(spotPrice);
+    refLines += `<line x1="${padL}" y1="${yS}" x2="${padL + plotW}" y2="${yS}" stroke="#ef6b6b" stroke-dasharray="3,3" stroke-width="2"/>`;
+    refLines += `<text x="${padL + plotW + 4}" y="${yS + 3}" fill="#ef6b6b" font-size="10" font-weight="bold">Spot ${fmt(spotPrice)}</text>`;
+  }
+
+  let dateLabels = '';
+  if (series.length > 0) {
+    const firstDate = series[0].date.slice(5);
+    const lastDate = series[series.length - 1].date.slice(5);
+    dateLabels += `<text x="${padL}" y="${padT + plotH + 18}" fill="#788299" font-size="10" text-anchor="start">${firstDate}</text>`;
+    if (series.length > 2) {
+      const midIdx = Math.floor(series.length / 2);
+      const midDate = series[midIdx].date.slice(5);
+      dateLabels += `<text x="${getX(midIdx)}" y="${padT + plotH + 18}" fill="#788299" font-size="10" text-anchor="middle">${midDate}</text>`;
+    }
+    dateLabels += `<text x="${padL + plotW}" y="${padT + plotH + 18}" fill="#788299" font-size="10" text-anchor="end">${lastDate}</text>`;
+  }
+
+  return `
+    <svg viewBox="0 0 ${svgW} ${svgH}" class="chart-svg" style="width:100%;height:185px;display:block">
+      ${gridLines}
+      ${volBars}
+      ${polyline}
+      ${dots}
+      ${refLines}
+      ${dateLabels}
+    </svg>
+  `;
+}
+
+function openHistoryModal(itemId, preferredLoc) {
+  if (!itemId) return;
+  histModalState.itemId = itemId;
+  histModalState.loc = preferredLoc || histModalState.loc || 'Black Market';
+  const modal = $('#histModal');
+  if (modal) modal.classList.remove('hidden');
+  renderHistoryModal();
+}
+
+function closeHistoryModal() {
+  const modal = $('#histModal');
+  if (modal) modal.classList.add('hidden');
+}
+
+function renderHistoryModal() {
+  const id = histModalState.itemId;
+  if (!id) return closeHistoryModal();
+
+  const info = getItemDisplayInfo(id);
+  const isGear = id.startsWith('T') && (id.includes('PLATE') || id.includes('BOW') || id.includes('CROSSBOW'));
+  const locs = isGear ? GD.saleLocs : GD.cities;
+  if (!locs.includes(histModalState.loc)) histModalState.loc = locs[0];
+
+  const curLoc = histModalState.loc;
+  const spotPrice = getQP(id, curLoc, 1) || getP(id, curLoc);
+  const vol = getVol(id, curLoc);
+  const health = analyzePriceHealth(spotPrice, vol);
+
+  const headerEl = $('#histHeader');
+  if (headerEl) {
+    headerEl.innerHTML = `
+      <img src="${itemIconUrl(id, 1)}" class="hist-icon" onerror="this.style.display='none'">
+      <div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span>${esc(info.name)}</span>
+          <span class="tag">${esc(info.tier)}</span>
+        </div>
+        <div class="muted" style="font-size:12px;font-weight:normal">${esc(info.sub)} · ID: <code>${esc(id)}</code></div>
+      </div>
+    `;
+  }
+
+  const bodyEl = $('#histBody');
+  if (!bodyEl) return;
+
+  const tabsHtml = `
+    <div class="hist-tabs">
+      ${locs.map(l => `<button class="hist-tab ${l === curLoc ? 'active' : ''}" data-hist-tab="${l}">${locName(l)}</button>`).join('')}
+    </div>
+  `;
+
+  const bannerHtml = `
+    <div class="health-banner ${health.status}">
+      <div class="hb-icon">${health.icon}</div>
+      <div>
+        <div class="hb-title">${esc(health.title)}</div>
+        <div class="hb-desc">${esc(health.desc)}</div>
+      </div>
+    </div>
+  `;
+
+  const diffStr = health.diffPct !== null ? `${health.diffPct >= 0 ? '+' : ''}${health.diffPct}% vs VWAP` : '—';
+  const spotValCls = health.diffPct && health.diffPct >= 25 ? 'neg' : (health.diffPct && health.diffPct <= -25 ? 'pos' : '');
+
+  const gridHtml = `
+    <div class="hist-grid">
+      <div class="hist-stat">
+        <div class="lbl">Preço de Mercado Atual (Spot)</div>
+        <div class="val ${spotValCls}">${spotPrice ? fmt(spotPrice) + 's' : 'Sem oferta'}</div>
+        <div class="sub">${diffStr}</div>
+      </div>
+      <div class="hist-stat">
+        <div class="lbl">Preço Médio Ponderado (VWAP 28d)</div>
+        <div class="val" style="color:var(--accent)">${vol && (vol.vwap28 || vol.vwap) ? fmt(vol.vwap28 || vol.vwap) + 's' : '—'}</div>
+        <div class="sub">Média real ponderada por volume</div>
+      </div>
+      <div class="hist-stat">
+        <div class="lbl">VWAP Recente (Últimos 7 dias)</div>
+        <div class="val">${vol && vol.vwap7 ? fmt(vol.vwap7) + 's' : '—'}</div>
+        <div class="sub">${vol && vol.total7 ? fmt(vol.total7) + ' un. vendidas em 7d' : 'Pouco movimento recente'}</div>
+      </div>
+      <div class="hist-stat">
+        <div class="lbl">Demanda Diária Média</div>
+        <div class="val">${vol && vol.daily !== undefined ? fmt(vol.daily, 1) + ' un/dia' : '—'}</div>
+        <div class="sub">${vol && vol.total28 ? 'Total 28d: ' + fmt(vol.total28) + ' un.' : 'Sem compras registradas'}</div>
+      </div>
+      <div class="hist-stat">
+        <div class="lbl">Faixa de Preço (Min - Max)</div>
+        <div class="val">${vol && vol.minPrice && vol.maxPrice ? fmt(vol.minPrice) + ' - ' + fmt(vol.maxPrice) + 's' : '—'}</div>
+        <div class="sub">${vol && vol.volatility ? 'Oscilação: ±' + vol.volatility + '%' : 'Sem oscilação registrada'}</div>
+      </div>
+      <div class="hist-stat">
+        <div class="lbl">Última Venda Registrada</div>
+        <div class="val">${vol && vol.lastDate ? vol.lastDate : '—'}</div>
+        <div class="sub">${vol && vol.daysSinceLast !== undefined && vol.daysSinceLast < 900 ? `há ${vol.daysSinceLast} dia(s)` : 'Sem registro'}</div>
+      </div>
+    </div>
+  `;
+
+  let chartHtml = '';
+  if (vol && vol.series && vol.series.length > 0) {
+    chartHtml = `
+      <div class="chart-card">
+        <div class="chart-head">
+          <h4>📈 Histórico Diário de Volume e Preço Médio (Últimos 28 dias)</h4>
+          <div class="chart-legend">
+            <span><span class="leg-dot" style="background:#4cc38a"></span> Preço Médio Diário</span>
+            <span><span class="leg-dot" style="background:#f0c04b"></span> VWAP Histórico</span>
+            ${spotPrice ? '<span><span class="leg-dot" style="background:#ef6b6b"></span> Spot Atual</span>' : ''}
+            <span><span class="leg-dot" style="background:#335073"></span> Volume Vendido</span>
+          </div>
+        </div>
+        ${renderHistorySvg(vol.series, spotPrice, vol.vwap)}
+      </div>
+    `;
+  } else {
+    chartHtml = `
+      <div class="chart-card" style="text-align:center;padding:24px">
+        <p class="muted" style="margin-bottom:12px">Os dados detalhados dia a dia para este item ainda não estão carregados na memória local.</p>
+        <button class="btn" id="fetchSingleHistBtn" data-item-id="${esc(id)}">⚡ Atualizar Histórico Detalhado Deste Item</button>
+      </div>
+    `;
+  }
+
+  let tableHtml = '';
+  if (vol && vol.series && vol.series.length > 0) {
+    tableHtml = `
+      <div class="card" style="margin:0">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <h4 style="margin:0;font-size:13px;color:var(--text)">📅 Detalhamento das Transações Diárias</h4>
+          <button class="ghost" id="fetchSingleHistBtn" data-item-id="${esc(id)}" style="font-size:11px;padding:3px 8px">↻ Atualizar Agora</button>
+        </div>
+        <div class="tablewrap" style="max-height:220px">
+          <table>
+            <tr><th class="l">Data</th><th>Unidades Vendidas</th><th>Preço Médio do Dia</th><th>Movimentação (Prata)</th></tr>
+            ${[...vol.series].reverse().map(s => `
+              <tr>
+                <td class="l"><b>${s.date}</b></td>
+                <td>${fmt(s.count)} un.</td>
+                <td class="best">${fmt(s.avg)}s</td>
+                <td class="pos">${fmt(s.count * s.avg)}s</td>
+              </tr>
+            `).join('')}
+          </table>
+        </div>
+      </div>
+    `;
+  }
+
+  bodyEl.innerHTML = `
+    ${tabsHtml}
+    ${bannerHtml}
+    ${gridHtml}
+    ${chartHtml}
+    ${tableHtml}
+  `;
+}
+
+async function fetchSingleItemHistory(itemId) {
+  if (!itemId) return;
+  const btn = $('#fetchSingleHistBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Buscando histórico…'; }
+  toast(`📊 Buscando histórico diário detalhado de ${itemId}…`, 15000);
+  const locs = GD.saleLocs.join(',');
+  try {
+    const url = `/api/history?server=${ST.config.server}&items=${encodeURIComponent(itemId)}&locations=${encodeURIComponent(locs)}`;
+    const r = await fetch(url);
+    const data = await r.json().catch(() => ({ error: 'resposta inválida' }));
+    if (Array.isArray(data)) {
+      let count = 0;
+      for (const entry of data) {
+        const summary = calcVolumeSummary(entry.data);
+        if (summary) {
+          ST.volumes[itemId] = ST.volumes[itemId] || {};
+          ST.volumes[itemId][entry.location] = summary;
+          count++;
+        }
+      }
+      save();
+      toast(`✓ Histórico de ${count} praças atualizado com sucesso!`);
+      renderHistoryModal();
+    } else {
+      toast(`Erro ao obter dados: ${data.error || 'resposta não reconhecida'}`);
+    }
+  } catch (err) {
+    toast(`Erro ao consultar histórico: ${err.message}`);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '⚡ Atualizar Histórico Detalhado Deste Item'; }
+  }
+}
+
 /* ---------------- eventos ---------------- */
 function bind() {
   $('#tabs').addEventListener('click', e => {
@@ -1631,6 +2160,32 @@ function bind() {
       a.download = `albion-craft-backup-${new Date().toISOString().slice(0, 10)}.json`; a.click();
     }
   });
+
+  $('#histClose')?.addEventListener('click', closeHistoryModal);
+  $('#histModal')?.addEventListener('click', e => {
+    if (e.target.id === 'histModal') closeHistoryModal();
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeHistoryModal();
+  });
+  document.addEventListener('click', e => {
+    const histBtn = e.target.closest('[data-hist-id]');
+    if (histBtn) {
+      e.preventDefault();
+      openHistoryModal(histBtn.dataset.histId, histBtn.dataset.histLoc);
+      return;
+    }
+    const tabBtn = e.target.closest('[data-hist-tab]');
+    if (tabBtn) {
+      histModalState.loc = tabBtn.dataset.histTab;
+      renderHistoryModal();
+      return;
+    }
+    if (e.target.id === 'fetchSingleHistBtn') {
+      fetchSingleItemHistory(e.target.dataset.itemId);
+      return;
+    }
+  });
 }
 
 /* ---------------- leitor em tempo real ---------------- */
@@ -1705,6 +2260,8 @@ async function checkLiveStatus() {
     ...ST.config
   };
   rankFilter.quality = rankFilter.quality || ST.config.targetQuality || 'mix';
+  rankFilter.sellPricing = rankFilter.sellPricing || 'spot';
+  rankFilter.healthFilter = rankFilter.healthFilter || 'all';
   bind();
   render();
   checkLiveStatus();

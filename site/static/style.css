@@ -92,3 +92,66 @@ button.icon:hover{color:var(--red)}
 .slippage-banner{background:#261d15;border:1px solid rgba(240,133,75,0.5);border-radius:10px;padding:10px 14px;margin:12px 0;display:flex;align-items:center;gap:10px;font-size:13px;color:#f3caa5}
 .slippage-banner b{color:#f0854b}
 
+/* Badges de Confiabilidade / Saúde do Preço */
+.health-pill{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;white-space:nowrap;cursor:pointer;transition:transform .15s ease,filter .15s ease;user-select:none}
+.health-pill:hover{transform:scale(1.05);filter:brightness(1.15)}
+.health-stable{background:#132b1f;color:#4cc38a;border:1px solid rgba(76,195,138,0.4)}
+.health-inflated{background:#3b1414;color:#ef6b6b;border:1px solid rgba(239,107,107,0.5);box-shadow:0 0 6px rgba(239,107,107,0.3)}
+.health-dump{background:#3b2314;color:#f0854b;border:1px solid rgba(240,133,75,0.4)}
+.health-moderate{background:#3b3214;color:#f0c04b;border:1px solid rgba(240,192,75,0.4)}
+.health-nosales{background:#29181a;color:#d88282;border:1px solid rgba(216,130,130,0.3)}
+.health-nodata{background:#1f232e;color:var(--muted);border:1px solid var(--line)}
+.health-none{background:transparent;color:var(--muted)}
+
+/* Modal de Histórico e Análise */
+.modal-overlay{position:fixed;inset:0;background:rgba(8,10,14,0.8);backdrop-filter:blur(4px);z-index:100;display:flex;align-items:center;justify-content:center;padding:16px;opacity:1;transition:opacity .2s ease}
+.modal-overlay.hidden{display:none;opacity:0}
+.modal-dialog{background:var(--panel);border:1px solid var(--line);border-radius:14px;width:100%;max-width:880px;max-height:92vh;display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(0,0,0,0.7);overflow:hidden}
+.modal-header{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;background:#151821;border-bottom:1px solid var(--line)}
+.modal-title{display:flex;align-items:center;gap:12px;font-size:16px;font-weight:700;color:var(--text)}
+.modal-title .hist-icon{width:40px;height:40px;border-radius:8px;background:var(--panel2);border:1px solid var(--line)}
+.modal-close{background:none;border:0;color:var(--muted);font-size:20px;cursor:pointer;padding:4px 8px;border-radius:6px;transition:all .15s}
+.modal-close:hover{color:var(--red);background:rgba(239,107,107,0.15)}
+.modal-body{padding:20px;overflow-y:auto;display:flex;flex-direction:column;gap:16px}
+
+/* Abas de Cidade no Modal */
+.hist-tabs{display:flex;gap:6px;flex-wrap:wrap;border-bottom:1px solid var(--line);padding-bottom:10px}
+.hist-tab{background:var(--panel2);color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s}
+.hist-tab:hover{color:var(--text);border-color:var(--accent)}
+.hist-tab.active{background:var(--accent);color:#1a1405;border-color:var(--accent)}
+
+/* Banner Diagnóstico */
+.health-banner{border-radius:10px;padding:14px 16px;display:flex;gap:14px;align-items:flex-start}
+.health-banner .hb-icon{font-size:24px;line-height:1}
+.health-banner .hb-title{font-size:14px;font-weight:700;margin-bottom:3px}
+.health-banner .hb-desc{font-size:12px;line-height:1.45;opacity:0.95}
+.health-banner.inflated{background:#2a1114;border:1px solid rgba(239,107,107,0.5);color:#ff9b9b}
+.health-banner.inflated .hb-title{color:#ef6b6b}
+.health-banner.stable{background:#11261b;border:1px solid rgba(76,195,138,0.5);color:#92f0be}
+.health-banner.stable .hb-title{color:#4cc38a}
+.health-banner.dump{background:#261810;border:1px solid rgba(240,133,75,0.5);color:#ffc59e}
+.health-banner.dump .hb-title{color:#f0854b}
+.health-banner.moderate{background:#262110;border:1px solid rgba(240,192,75,0.5);color:#ffe49e}
+.health-banner.moderate .hb-title{color:#f0c04b}
+.health-banner.nosales{background:#221518;border:1px solid rgba(216,130,130,0.4);color:#e2a5a5}
+.health-banner.nosales .hb-title{color:#da7878}
+.health-banner.nodata{background:#1c202b;border:1px solid var(--line);color:var(--muted)}
+.health-banner.nodata .hb-title{color:var(--text)}
+
+/* Grid de Métricas no Modal */
+.hist-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.hist-stat{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+.hist-stat .lbl{color:var(--muted);font-size:11px}
+.hist-stat .val{font-size:16px;font-weight:700;margin-top:2px}
+.hist-stat .sub{font-size:11px;color:var(--muted);margin-top:2px}
+
+/* Container do Gráfico SVG */
+.chart-card{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.chart-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:8px}
+.chart-head h4{margin:0;font-size:13px;color:var(--accent)}
+.chart-legend{display:flex;gap:12px;font-size:11px;color:var(--muted)}
+.chart-legend span{display:inline-flex;align-items:center;gap:4px}
+.chart-legend .leg-dot{width:8px;height:8px;border-radius:50%}
+.chart-svg{width:100%;height:190px;overflow:visible}
+
+

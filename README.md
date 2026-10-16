@@ -53,26 +53,47 @@ Sistema integrado de **Refino de Minérios e Madeiras** e **Craft de Equipamento
    - Alertas visuais de derrapagem (`⚠️ Spot vs VWAP`) no Refino e no Planejador.
    - Modos de compra configuráveis: **Inteligente (Anti-Slippage)**, **Preço Médio Real (VWAP)**, **Menor Oferta Spot** e **Spot + Margem (5% ou 10%)**.
 
-6. **Comparador Multi-Cidades & Mercado Negro:**
+6. **Leitura de Histórico de Preço e Diagnóstico de Saúde de Mercado (Anti-Trolls / Anti-Anomalias):**
+   - Identifica instantaneamente se uma cotação de mercado é **Confiável e Estável** ou **Perigosa / Anormal** (ofertas troll de 1 unidade, mercado esvaziado ou itens estagnados sem compradores).
+   - **Badges de Saúde e Diagnóstico Automatizado:**
+     - 🟢 **Estável & Confiável:** Preço spot alinhado com o VWAP histórico (±12%) e vendas recentes ativas nos últimos 7 dias. Lucro seguro e comprovado.
+     - ⚠️ **Anormal / Inflado (+25% ou mais acima do VWAP):** Alerta crítico contra anúncios trolls de 1 peça com preços astronômicos que geram lucros ilusórios no ranking.
+     - 📉 **Abaixo da Média / Dump (-25% ou mais abaixo do VWAP):** Preço abaixo da média histórica; oportunidade de compra rápida ou queima de estoque.
+     - 🟡 **Oscilando / Moderado:** Variação intermediária em relação à média histórica.
+     - ⛔ **Sem Vendas / Mercado Parado:** Sem transações nos últimos 21 dias (alerta de prata parada).
+   - **Modal Interativo de Histórico Completo:**
+     - Clique em qualquer badge de saúde ou de volume para abrir o modal detalhado do item.
+     - **Gráfico SVG Interativo (28 dias):** Curva de preço médio diário, barras de volume negociado, linha guia do VWAP histórico e linha guia do preço Spot atual (mostrando visualmente se a oferta é um pico irreal ou preço consistente).
+     - **Tabela Transacional Dia a Dia:** Histórico com data, unidades vendidas no dia, preço médio e volume total em prata.
+     - **Abas de Mercado:** Alterne instantaneamente entre o Mercado Negro e todas as cidades reais.
+     - **Atualização Instantânea:** Botão para atualizar o histórico detalhado sob demanda para o item consultado.
+   - **Base de Preço de Venda no Ranking:**
+     - `⚡ Mercado Atual (Spot)`: Menor oferta de venda nas cidades ou maior ordem de compra no Mercado Negro.
+     - `📊 Preço Histórico Real (VWAP)`: Calcula a lucratividade com base no VWAP real, blindando o ranking contra anúncios trolls.
+     - `🛡️ Mais Seguro`: Usa o menor valor entre Spot e VWAP.
+     - `💡 Inteligente`: Usa Spot normalmente, mas substitui pelo VWAP caso o anúncio esteja inflado (+25%).
+   - **Filtro de Saúde:** Permite filtrar o ranking por itens estáveis, ocultar preços anormais ou esconder itens sem vendas recentes.
+
+7. **Comparador Multi-Cidades & Mercado Negro:**
    - Preços de compra comparados nas 5 cidades reais (*Thetford, Martlock, Bridgewatch, Lymhurst, Fort Sterling*).
    - Preços de venda comparados nas 5 cidades, **Caerleon** e **Mercado Negro (Black Market)**.
 
-7. **Leitor de Mercado em Tempo Real (In-Game Packet Capture):**
+8. **Leitor de Mercado em Tempo Real (In-Game Packet Capture):**
    - Captura preços **automaticamente e em tempo real** diretamente do jogo conforme você visita os mercados das cidades e do Mercado Negro.
    - Suporte a captura de qualidades (1 a 5) e profundidade de ordens (quantidades disponíveis).
    - **100% Seguro e em Conformidade com as Regras (TOS) da Sandbox Interactive:** Funciona por monitoramento passivo de pacotes de rede locais (via driver Npcap), **sem injetar código nem tocar na memória do cliente do jogo**.
    - Integração direta: alimenta o servidor local em `/api/ingest`, atualizando as tabelas e o ranking de lucro no navegador instantaneamente com alertas visuais.
 
-8. **Busca Automática via API Pública:**
+9. **Busca Automática via API Pública:**
    - Integração com a API pública do **Albion Online Data Project** (servidores *Américas / West*, *Europa* e *Ásia / East*).
    - Envio em lotes otimizados com pausa automática (*throttle*) e tratamento com retentativa inteligente para evitar erros de limite de requisições (`HTTP 429`).
    - Indicação visual de preços desatualizados (> 48h) e suporte a edição manual de qualquer valor.
 
-9. **Planejador & Lista de Compras Consolidada:**
-   - Permite misturar Placas, Arcos e Bestas no mesmo plano de produção e informa o custo total, receita esperada, lucro líquido e giro do lote.
-   - Gera uma **Lista de Compras Consolidada** separando **Minérios**, **Barras Prontas**, **Madeiras**, **Tábuas Prontas**, **Artefatos**, **Emblemas Reais** e **Peças Base** (já descontando os retornos de recursos esperados), indicando em qual cidade comprar cada item pelo menor preço.
+10. **Planejador & Lista de Compras Consolidada:**
+    - Permite misturar Placas, Arcos e Bestas no mesmo plano de produção e informa o custo total, receita esperada, lucro líquido e giro do lote.
+    - Gera uma **Lista de Compras Consolidada** separando **Minérios**, **Barras Prontas**, **Madeiras**, **Tábuas Prontas**, **Artefatos**, **Emblemas Reais** e **Peças Base** (já descontando os retornos de recursos esperados), indicando em qual cidade comprar cada item pelo menor preço.
 
-10. **Versão Planilha Excel:**
+11. **Versão Planilha Excel:**
     - Acompanha o arquivo `Planilha_Craft_Placas.xlsx` com fórmulas matemáticas idênticas e validadas diretamente no Excel.
 
 ---
