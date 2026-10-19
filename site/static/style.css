@@ -154,4 +154,20 @@ button.icon:hover{color:var(--red)}
 .chart-legend .leg-dot{width:8px;height:8px;border-radius:50%}
 .chart-svg{width:100%;height:190px;overflow:visible}
 
+/* Culinária & Insumos */
+.food-icon{width:36px;height:36px;border-radius:6px;vertical-align:middle;background:var(--panel2);border:1px solid var(--line);margin-right:6px}
+.food-chip{display:inline-flex;align-items:center;gap:3px;padding:2px 6px;border-radius:4px;font-size:11px;background:var(--panel2);border:1px solid var(--line);margin:1px 2px}
+.food-chip img{width:18px;height:18px}
+.arb-badge{display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:10px;font-size:11px;font-weight:700}
+.arb-win{background:#173825;color:#4cc38a;border:1px solid rgba(76,195,138,0.4)}
+.arb-loss{background:#232735;color:var(--muted);border:1px solid var(--line)}
+.tag.pie{color:#f5a623;border-color:rgba(245,166,35,0.4)}
+.tag.omelette{color:#f8e71c;border-color:rgba(248,231,28,0.4)}
+.tag.stew{color:#e06a3b;border-color:rgba(224,106,59,0.4)}
+.tag.sandwich{color:#bd10e0;border-color:rgba(189,16,224,0.4)}
+.tag.roast{color:#b8e986;border-color:rgba(184,233,134,0.4)}
+.tag.salad{color:#50e3c2;border-color:rgba(80,227,194,0.4)}
+.tag.soup{color:#4a90e2;border-color:rgba(74,144,226,0.4)}
+
+
 

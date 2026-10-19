@@ -1921,6 +1921,1444 @@
   "QUESTITEM_TOKEN_ROYAL_T5": "Expert's Royal Sigil",
   "QUESTITEM_TOKEN_ROYAL_T6": "Master's Royal Sigil",
   "QUESTITEM_TOKEN_ROYAL_T7": "Grandmaster's Royal Sigil",
-  "QUESTITEM_TOKEN_ROYAL_T8": "Elder's Royal Sigil"
- }
+  "QUESTITEM_TOKEN_ROYAL_T8": "Elder's Royal Sigil",
+  "T1_CARROT": "Cenoura",
+  "T2_BEAN": "Feijão",
+  "T3_WHEAT": "Feixe de Trigo",
+  "T4_TURNIP": "Nabo",
+  "T5_CABBAGE": "Repolho",
+  "T6_POTATO": "Batata",
+  "T7_CORN": "Fardo de Milho",
+  "T8_PUMPKIN": "Abóbora",
+  "T3_EGG": "Ovo de Galinha",
+  "T5_EGG": "Ovo de Ganso",
+  "T4_MILK": "Leite de Cabra",
+  "T6_MILK": "Leite de Ovelha",
+  "T8_MILK": "Leite de Vaca",
+  "T3_MEAT": "Galinha Crua",
+  "T4_MEAT": "Cabra Crua",
+  "T5_MEAT": "Ganso Cru",
+  "T6_MEAT": "Carneiro Cru",
+  "T7_MEAT": "Porco Cru",
+  "T8_MEAT": "Carne Crua",
+  "T3_FARM_CHICKEN_GROWN": "Galinha",
+  "T4_FARM_GOAT_GROWN": "Cabra",
+  "T5_FARM_GOOSE_GROWN": "Ganso",
+  "T6_FARM_SHEEP_GROWN": "Ovelha",
+  "T7_FARM_PIG_GROWN": "Porco",
+  "T8_FARM_COW_GROWN": "Vaca",
+  "T3_FLOUR": "Farinha",
+  "T4_BREAD": "Pão",
+  "T4_BUTTER": "Manteiga de Cabra",
+  "T6_BUTTER": "Manteiga de Ovelha",
+  "T8_BUTTER": "Manteiga de Vaca",
+  "T1_FISHSAUCE_LEVEL1": "Molho de Peixe Básico",
+  "T1_FISHSAUCE_LEVEL2": "Molho de Peixe Extravagante",
+  "T1_FISHSAUCE_LEVEL3": "Molho de Peixe Especial",
+  "T3_MEAL_PIE": "Torta de Galinha",
+  "T3_MEAL_PIE@1": "Torta de Galinha .1",
+  "T3_MEAL_PIE@2": "Torta de Galinha .2",
+  "T3_MEAL_PIE@3": "Torta de Galinha .3",
+  "T5_MEAL_PIE": "Torta de Ganso",
+  "T5_MEAL_PIE@1": "Torta de Ganso .1",
+  "T5_MEAL_PIE@2": "Torta de Ganso .2",
+  "T5_MEAL_PIE@3": "Torta de Ganso .3",
+  "T7_MEAL_PIE": "Torta de Porco",
+  "T7_MEAL_PIE@1": "Torta de Porco .1",
+  "T7_MEAL_PIE@2": "Torta de Porco .2",
+  "T7_MEAL_PIE@3": "Torta de Porco .3",
+  "T3_MEAL_OMELETTE": "Omelete de Galinha",
+  "T3_MEAL_OMELETTE@1": "Omelete de Galinha .1",
+  "T3_MEAL_OMELETTE@2": "Omelete de Galinha .2",
+  "T3_MEAL_OMELETTE@3": "Omelete de Galinha .3",
+  "T5_MEAL_OMELETTE": "Omelete de Ganso",
+  "T5_MEAL_OMELETTE@1": "Omelete de Ganso .1",
+  "T5_MEAL_OMELETTE@2": "Omelete de Ganso .2",
+  "T5_MEAL_OMELETTE@3": "Omelete de Ganso .3",
+  "T7_MEAL_OMELETTE": "Omelete de Porco",
+  "T7_MEAL_OMELETTE@1": "Omelete de Porco .1",
+  "T7_MEAL_OMELETTE@2": "Omelete de Porco .2",
+  "T7_MEAL_OMELETTE@3": "Omelete de Porco .3",
+  "T4_MEAL_STEW": "Guisado de Cabra",
+  "T4_MEAL_STEW@1": "Guisado de Cabra .1",
+  "T4_MEAL_STEW@2": "Guisado de Cabra .2",
+  "T4_MEAL_STEW@3": "Guisado de Cabra .3",
+  "T6_MEAL_STEW": "Guisado de Carneiro",
+  "T6_MEAL_STEW@1": "Guisado de Carneiro .1",
+  "T6_MEAL_STEW@2": "Guisado de Carneiro .2",
+  "T6_MEAL_STEW@3": "Guisado de Carneiro .3",
+  "T8_MEAL_STEW": "Guisado de Carne",
+  "T8_MEAL_STEW@1": "Guisado de Carne .1",
+  "T8_MEAL_STEW@2": "Guisado de Carne .2",
+  "T8_MEAL_STEW@3": "Guisado de Carne .3",
+  "T4_MEAL_SANDWICH": "Sanduíche de Cabra",
+  "T4_MEAL_SANDWICH@1": "Sanduíche de Cabra .1",
+  "T4_MEAL_SANDWICH@2": "Sanduíche de Cabra .2",
+  "T4_MEAL_SANDWICH@3": "Sanduíche de Cabra .3",
+  "T6_MEAL_SANDWICH": "Sanduíche de Carneiro",
+  "T6_MEAL_SANDWICH@1": "Sanduíche de Carneiro .1",
+  "T6_MEAL_SANDWICH@2": "Sanduíche de Carneiro .2",
+  "T6_MEAL_SANDWICH@3": "Sanduíche de Carneiro .3",
+  "T8_MEAL_SANDWICH": "Sanduíche de Carne",
+  "T8_MEAL_SANDWICH@1": "Sanduíche de Carne .1",
+  "T8_MEAL_SANDWICH@2": "Sanduíche de Carne .2",
+  "T8_MEAL_SANDWICH@3": "Sanduíche de Carne .3",
+  "T3_MEAL_ROAST": "Frango Assado",
+  "T3_MEAL_ROAST@1": "Frango Assado .1",
+  "T3_MEAL_ROAST@2": "Frango Assado .2",
+  "T3_MEAL_ROAST@3": "Frango Assado .3",
+  "T5_MEAL_ROAST": "Ganso Assado",
+  "T5_MEAL_ROAST@1": "Ganso Assado .1",
+  "T5_MEAL_ROAST@2": "Ganso Assado .2",
+  "T5_MEAL_ROAST@3": "Ganso Assado .3",
+  "T7_MEAL_ROAST": "Porco Assado",
+  "T7_MEAL_ROAST@1": "Porco Assado .1",
+  "T7_MEAL_ROAST@2": "Porco Assado .2",
+  "T7_MEAL_ROAST@3": "Porco Assado .3",
+  "T2_MEAL_SALAD": "Salada de Feijão",
+  "T2_MEAL_SALAD@1": "Salada de Feijão .1",
+  "T2_MEAL_SALAD@2": "Salada de Feijão .2",
+  "T2_MEAL_SALAD@3": "Salada de Feijão .3",
+  "T4_MEAL_SALAD": "Salada de Nabo",
+  "T4_MEAL_SALAD@1": "Salada de Nabo .1",
+  "T4_MEAL_SALAD@2": "Salada de Nabo .2",
+  "T4_MEAL_SALAD@3": "Salada de Nabo .3",
+  "T6_MEAL_SALAD": "Salada de Batata",
+  "T6_MEAL_SALAD@1": "Salada de Batata .1",
+  "T6_MEAL_SALAD@2": "Salada de Batata .2",
+  "T6_MEAL_SALAD@3": "Salada de Batata .3",
+  "T1_MEAL_SOUP": "Sopa de Cenoura",
+  "T1_MEAL_SOUP@1": "Sopa de Cenoura .1",
+  "T1_MEAL_SOUP@2": "Sopa de Cenoura .2",
+  "T1_MEAL_SOUP@3": "Sopa de Cenoura .3",
+  "T3_MEAL_SOUP": "Sopa de Trigo",
+  "T3_MEAL_SOUP@1": "Sopa de Trigo .1",
+  "T3_MEAL_SOUP@2": "Sopa de Trigo .2",
+  "T3_MEAL_SOUP@3": "Sopa de Trigo .3",
+  "T5_MEAL_SOUP": "Sopa de Repolho",
+  "T5_MEAL_SOUP@1": "Sopa de Repolho .1",
+  "T5_MEAL_SOUP@2": "Sopa de Repolho .2",
+  "T5_MEAL_SOUP@3": "Sopa de Repolho .3"
+ },
+ "foods": [
+  {
+   "id": "T3_MEAL_PIE",
+   "family": "pie",
+   "familyLabel": "Torta",
+   "tier": 3,
+   "name": "Torta de Galinha",
+   "nameEn": "Chicken Pie",
+   "amountCrafted": 10,
+   "craftFocus": 53,
+   "nutrition": 78,
+   "iv": 40,
+   "batchIv": 400,
+   "ingredients": [
+    {
+     "id": "T3_WHEAT",
+     "count": 2,
+     "name": "Feixe de Trigo",
+     "iv": 40
+    },
+    {
+     "id": "T3_FLOUR",
+     "count": 4,
+     "name": "Farinha",
+     "iv": 0
+    },
+    {
+     "id": "T3_MEAT",
+     "count": 8,
+     "name": "Galinha Crua",
+     "iv": 40
+    }
+   ],
+   "enchantments": [
+    {
+     "level": 1,
+     "id": "T3_MEAL_PIE@1",
+     "sauceId": "T1_FISHSAUCE_LEVEL1",
+     "sauceCount": 10,
+     "saucePerItem": 1.0,
+     "sauceName": "Molho de Peixe Básico"
+    },
+    {
+     "level": 2,
+     "id": "T3_MEAL_PIE@2",
+     "sauceId": "T1_FISHSAUCE_LEVEL2",
+     "sauceCount": 10,
+     "saucePerItem": 1.0,
+     "sauceName": "Molho de Peixe Extravagante"
+    },
+    {
+     "level": 3,
+     "id": "T3_MEAL_PIE@3",
+     "sauceId": "T1_FISHSAUCE_LEVEL3",
+     "sauceCount": 10,
+     "saucePerItem": 1.0,
+     "sauceName": "Molho de Peixe Especial"
+    }
+   ]
+  },
+  {
+   "id": "T5_MEAL_PIE",
+   "family": "pie",
+   "familyLabel": "Torta",
+   "tier": 5,
+   "name": "Torta de Ganso",
+   "nameEn": "Goose Pie",
+   "amountCrafted": 10,
+   "craftFocus": 180,
+   "nutrition": 266,
+   "iv": 144,
+   "batchIv": 1440,
+   "ingredients": [
+    {
+     "id": "T5_CABBAGE",
+     "count": 6,
+     "name": "Repolho",
+     "iv": 40
+    },
+    {
+     "id": "T3_FLOUR",
+     "count": 12,
+     "name": "Farinha",
+     "iv": 0
+    },
+    {
+     "id": "T5_MEAT",
+     "count": 24,
+     "name": "Ganso Cru",
+     "iv": 40
+    },
+    {
+     "id": "T4_MILK",
+     "count": 6,
+     "name": "Leite de Cabra",
+     "iv": 40
+    }
+   ],
+   "enchantments": [
+    {
+     "level": 1,
+     "id": "T5_MEAL_PIE@1",
+     "sauceId": "T1_FISHSAUCE_LEVEL1",
+     "sauceCount": 30,
+     "saucePerItem": 3.0,
+     "sauceName": "Molho de Peixe Básico"
+    },
+    {
+     "level": 2,
+     "id": "T5_MEAL_PIE@2",
+     "sauceId": "T1_FISHSAUCE_LEVEL2",
+     "sauceCount": 30,
+     "saucePerItem": 3.0,
+     "sauceName": "Molho de Peixe Extravagante"
+    },
+    {
+     "level": 3,
+     "id": "T5_MEAL_PIE@3",
+     "sauceId": "T1_FISHSAUCE_LEVEL3",
+     "sauceCount": 30,
+     "saucePerItem": 3.0,
+     "sauceName": "Molho de Peixe Especial"
+    }
+   ]
+  },
+  {
+   "id": "T7_MEAL_PIE",
+   "family": "pie",
+   "familyLabel": "Torta",
+   "tier": 7,
+   "name": "Torta de Porco",
+   "nameEn": "Pork Pie",
+   "amountCrafted": 10,
+   "craftFocus": 540,
+   "nutrition": 799,
+   "iv": 432,
+   "batchIv": 4320,
+   "ingredients": [
+    {
+     "id": "T7_CORN",
+     "count": 18,
+     "name": "Fardo de Milho",
+     "iv": 40
+    },
+    {
+     "id": "T3_FLOUR",
+     "count": 36,
+     "name": "Farinha",
+     "iv": 0
+    },
+    {
+     "id": "T7_MEAT",
+     "count": 72,
+     "name": "Porco Cru",
+     "iv": 40
+    },
+    {
+     "id": "T6_MILK",
+     "count": 18,
+     "name": "Leite de Ovelha",
+     "iv": 40
+    }
+   ],
+   "enchantments": [
+    {
+     "level": 1,
+     "id": "T7_MEAL_PIE@1",
+     "sauceId": "T1_FISHSAUCE_LEVEL1",
+     "sauceCount": 90,
+     "saucePerItem": 9.0,
+     "sauceName": "Molho de Peixe Básico"
+    },
+    {
+     "level": 2,
+     "id": "T7_MEAL_PIE@2",
+     "sauceId": "T1_FISHSAUCE_LEVEL2",
+     "sauceCount": 90,
+     "saucePerItem": 9.0,
+     "sauceName": "Molho de Peixe Extravagante"
+    },
+    {
+     "level": 3,
+     "id": "T7_MEAL_PIE@3",
+     "sauceId": "T1_FISHSAUCE_LEVEL3",
+     "sauceCount": 90,
+     "saucePerItem": 9.0,
+     "sauceName": "Molho de Peixe Especial"
+    }
+   ]
+  },
+  {
+   "id": "T3_MEAL_OMELETTE",
+   "family": "omelette",
+   "familyLabel": "Omelete",
+   "tier": 3,
+   "name": "Omelete de Galinha",
+   "nameEn": "Chicken Omelette",
+   "amountCrafted": 10,
+   "craftFocus": 52,
+   "nutrition": 77,
+   "iv": 56,
+   "batchIv": 560,
+   "ingredients": [
+    {
+     "id": "T3_WHEAT",
+     "count": 4,
+     "name": "Feixe de Trigo",
+     "iv": 40
+    },
+    {
+     "id": "T3_MEAT",
+     "count": 8,
+     "name": "Galinha Crua",
+     "iv": 40
+    },
+    {
+     "id": "T3_EGG",
+     "count": 2,
+     "name": "Ovos de Galinha",
+     "iv": 40
+    }
+   ],
+   "enchantments": [
+    {
+     "level": 1,
+     "id": "T3_MEAL_OMELETTE@1",
+     "sauceId": "T1_FISHSAUCE_LEVEL1",
+     "sauceCount": 10,
+     "saucePerItem": 1.0,
+     "sauceName": "Molho de Peixe Básico"
+    },
+    {
+     "level": 2,
+     "id": "T3_MEAL_OMELETTE@2",
+     "sauceId": "T1_FISHSAUCE_LEVEL2",
+     "sauceCount": 10,
+     "saucePerItem": 1.0,
+     "sauceName": "Molho de Peixe Extravagante"
+    },
+    {
+     "level": 3,
+     "id": "T3_MEAL_OMELETTE@3",
+     "sauceId": "T1_FISHSAUCE_LEVEL3",
+     "sauceCount": 10,
+     "saucePerItem": 1.0,
+     "sauceName": "Molho de Peixe Especial"
+    }
+   ]
+  },
+  {
+   "id": "T5_MEAL_OMELETTE",
+   "family": "omelette",
+   "familyLabel": "Omelete",
+   "tier": 5,
+   "name": "Omelete de Ganso",
+   "nameEn": "Goose Omelette",
+   "amountCrafted": 10,
+   "craftFocus": 155,
+   "nutrition": 230,
+   "iv": 168,
+   "batchIv": 1680,
+   "ingredients": [
+    {
+     "id": "T5_CABBAGE",
+     "count": 12,
+     "name": "Repolho",
+     "iv": 40
+    },
+    {
+     "id": "T5_MEAT",
+     "count": 24,
+     "name": "Ganso Cru",
+     "iv": 40
+    },
+    {
+     "id": "T5_EGG",
+     "count": 6,
+     "name": "Ovos de Ganso",
+     "iv": 40
+    }
+   ],
+   "enchantments": [
+    {
+     "level": 1,
+     "id": "T5_MEAL_OMELETTE@1",
+     "sauceId": "T1_FISHSAUCE_LEVEL1",
+     "sauceCount": 30,
+     "saucePerItem": 3.0,
+     "sauceName": "Molho de Peixe Básico"
+    },
+    {
+     "level": 2,
+     "id": "T5_MEAL_OMELETTE@2",
+     "sauceId": "T1_FISHSAUCE_LEVEL2",
+     "sauceCount": 30,
+     "saucePerItem": 3.0,
+     "sauceName": "Molho de Peixe Extravagante"
+    },
+    {
+     "level": 3,
+     "id": "T5_MEAL_OMELETTE@3",
+     "sauceId": "T1_FISHSAUCE_LEVEL3",
+     "sauceCount": 30,
+     "saucePerItem": 3.0,
+     "sauceName": "Molho de Peixe Especial"
+    }
+   ]
+  },
+  {
+   "id": "T7_MEAL_OMELETTE",
+   "family": "omelette",
+   "familyLabel": "Omelete",
+   "tier": 7,
+   "name": "Omelete de Porco",
+   "nameEn": "Pork Omelette",
+   "amountCrafted": 10,
+   "craftFocus": 464,
+   "nutrition": 690,
+   "iv": 504,
+   "batchIv": 5040,
+   "ingredients": [
+    {
+     "id": "T7_CORN",
+     "count": 36,
+     "name": "Fardo de Milho",
+     "iv": 40
+    },
+    {
+     "id": "T7_MEAT",
+     "count": 72,
+     "name": "Porco Cru",
+     "iv": 40
+    },
+    {
+     "id": "T5_EGG",
+     "count": 18,
+     "name": "Ovos de Ganso",
+     "iv": 40
+    }
+   ],
+   "enchantments": [
+    {
+     "level": 1,
+     "id": "T7_MEAL_OMELETTE@1",
+     "sauceId": "T1_FISHSAUCE_LEVEL1",
+     "sauceCount": 90,
+     "saucePerItem": 9.0,
+     "sauceName": "Molho de Peixe Básico"
+    },
+    {
+     "level": 2,
+     "id": "T7_MEAL_OMELETTE@2",
+     "sauceId": "T1_FISHSAUCE_LEVEL2",
+     "sauceCount": 90,
+     "saucePerItem": 9.0,
+     "sauceName": "Molho de Peixe Extravagante"
+    },
+    {
+     "level": 3,
+     "id": "T7_MEAL_OMELETTE@3",
+     "sauceId": "T1_FISHSAUCE_LEVEL3",
+     "sauceCount": 90,
+     "saucePerItem": 9.0,
+     "sauceName": "Molho de Peixe Especial"
+    }
+   ]
+  },
+  {
+   "id": "T4_MEAL_STEW",
+   "family": "stew",
+   "familyLabel": "Ensopado",
+   "tier": 4,
+   "name": "Guisado de Cabra",
+   "nameEn": "Goat Stew",
+   "amountCrafted": 10,
+   "craftFocus": 61,
+   "nutrition": 91,
+   "iv": 48,
+   "batchIv": 480,
+   "ingredients": [
+    {
+     "id": "T4_TURNIP",
+     "count": 4,
+     "name": "Nabos",
+     "iv": 40
+    },
+    {
+     "id": "T4_BREAD",
+     "count": 4,
+     "name": "Pão",
+     "iv": 0
+    },
+    {
+     "id": "T4_MEAT",
+     "count": 8,
+     "name": "Cabra Crua",
+     "iv": 40
+    }
+   ],
+   "enchantments": [
+    {
+     "level": 1,
+     "id": "T4_MEAL_STEW@1",
+     "sauceId": "T1_FISHSAUCE_LEVEL1",
+     "sauceCount": 10,
+     "saucePerItem": 1.0,
+     "sauceName": "Molho de Peixe Básico"
+    },
+    {
+     "level": 2,
+     "id": "T4_MEAL_STEW@2",
+     "sauceId": "T1_FISHSAUCE_LEVEL2",
+     "sauceCount": 10,
+     "saucePerItem": 1.0,
+     "sauceName": "Molho de Peixe Extravagante"
+    },
+    {
+     "level": 3,
+     "id": "T4_MEAL_STEW@3",
+     "sauceId": "T1_FISHSAUCE_LEVEL3",
+     "sauceCount": 10,
+     "saucePerItem": 1.0,
+     "sauceName": "Molho de Peixe Especial"
+    }
+   ]
+  },
+  {
+   "id": "T6_MEAL_STEW",
+   "family": "stew",
+   "familyLabel": "Ensopado",
+   "tier": 6,
+   "name": "Guisado de Carneiro",
+   "nameEn": "Mutton Stew",
+   "amountCrafted": 10,
+   "craftFocus": 184,
+   "nutrition": 272,
+   "iv": 144,
+   "batchIv": 1440,
+   "ingredients": [
+    {
+     "id": "T6_POTATO",
+     "count": 12,
+     "name": "Batatas",
+     "iv": 40
+    },
+    {
+     "id": "T4_BREAD",
+     "count": 12,
+     "name": "Pão",
+     "iv": 0
+    },
+    {
+     "id": "T6_MEAT",
+     "count": 24,
+     "name": "Carneiro Cru",
+     "iv": 40
+    }
+   ],
+   "enchantments": [
+    {
+     "level": 1,
+     "id": "T6_MEAL_STEW@1",
+     "sauceId": "T1_FISHSAUCE_LEVEL1",
+     "sauceCount": 30,
+     "saucePerItem": 3.0,
+     "sauceName": "Molho de Peixe Básico"
+    },
+    {
+     "level": 2,
+     "id": "T6_MEAL_STEW@2",
+     "sauceId": "T1_FISHSAUCE_LEVEL2",
+     "sauceCount": 30,
+     "saucePerItem": 3.0,
+     "sauceName": "Molho de Peixe Extravagante"
+    },
+    {
+     "level": 3,
+     "id": "T6_MEAL_STEW@3",
+     "sauceId": "T1_FISHSAUCE_LEVEL3",
+     "sauceCount": 30,
+     "saucePerItem": 3.0,
+     "sauceName": "Molho de Peixe Especial"
+    }
+   ]
+  },
+  {
+   "id": "T8_MEAL_STEW",
+   "family": "stew",
+   "familyLabel": "Ensopado",
+   "tier": 8,
+   "name": "Guisado de Carne",
+   "nameEn": "Beef Stew",
+   "amountCrafted": 10,
+   "craftFocus": 551,
+   "nutrition": 817,
+   "iv": 432,
+   "batchIv": 4320,
+   "ingredients": [
+    {
+     "id": "T8_PUMPKIN",
+     "count": 36,
+     "name": "Abóbora",
+     "iv": 40
+    },
+    {
+     "id": "T4_BREAD",
+     "count": 36,
+     "name": "Pão",
+     "iv": 0
+    },
+    {
+     "id": "T8_MEAT",
+     "count": 72,
+     "name": "Carne Crua",
+     "iv": 40
+    }
+   ],
+   "enchantments": [
+    {
+     "level": 1,
+     "id": "T8_MEAL_STEW@1",
+     "sauceId": "T1_FISHSAUCE_LEVEL1",
+     "sauceCount": 90,
+     "saucePerItem": 9.0,
+     "sauceName": "Molho de Peixe Básico"
+    },
+    {
+     "level": 2,
+     "id": "T8_MEAL_STEW@2",
+     "sauceId": "T1_FISHSAUCE_LEVEL2",
+     "sauceCount": 90,
+     "saucePerItem": 9.0,
+     "sauceName": "Molho de Peixe Extravagante"
+    },
+    {
+     "level": 3,
+     "id": "T8_MEAL_STEW@3",
+     "sauceId": "T1_FISHSAUCE_LEVEL3",
+     "sauceCount": 90,
+     "saucePerItem": 9.0,
+     "sauceName": "Molho de Peixe Especial"
+    }
+   ]
+  },
+  {
+   "id": "T4_MEAL_SANDWICH",
+   "family": "sandwich",
+   "familyLabel": "Sanduíche",
+   "tier": 4,
+   "name": "Sanduíche de Cabra",
+   "nameEn": "Goat Sandwich",
+   "amountCrafted": 10,
+   "craftFocus": 55,
+   "nutrition": 81,
+   "iv": 32,
+   "batchIv": 320,
+   "ingredients": [
+    {
+     "id": "T4_BREAD",
+     "count": 4,
+     "name": "Pão",
+     "iv": 0
+    },
+    {
+     "id": "T4_MEAT",
+     "count": 8,
+     "name": "Cabra Crua",
+     "iv": 40
+    },
+    {
+     "id": "T4_BUTTER",
+     "count": 2,
+     "name": "Manteiga de Cabra",
+     "iv": 0
+    }
+   ],
+   "enchantments": [
+    {
+     "level": 1,
+     "id": "T4_MEAL_SANDWICH@1",
+     "sauceId": "T1_FISHSAUCE_LEVEL1",
+     "sauceCount": 10,
+     "saucePerItem": 1.0,
+     "sauceName": "Molho de Peixe Básico"
+    },
+    {
+     "level": 2,
+     "id": "T4_MEAL_SANDWICH@2",
+     "sauceId": "T1_FISHSAUCE_LEVEL2",
+     "sauceCount": 10,
+     "saucePerItem": 1.0,
+     "sauceName": "Molho de Peixe Extravagante"
+    },
+    {
+     "level": 3,
+     "id": "T4_MEAL_SANDWICH@3",
+     "sauceId": "T1_FISHSAUCE_LEVEL3",
+     "sauceCount": 10,
+     "saucePerItem": 1.0,
+     "sauceName": "Molho de Peixe Especial"
+    }
+   ]
+  },
+  {
+   "id": "T6_MEAL_SANDWICH",
+   "family": "sandwich",
+   "familyLabel": "Sanduíche",
+   "tier": 6,
+   "name": "Sanduíche de Carneiro",
+   "nameEn": "Mutton Sandwich",
+   "amountCrafted": 10,
+   "craftFocus": 165,
+   "nutrition": 243,
+   "iv": 96,
+   "batchIv": 960,
+   "ingredients": [
+    {
+     "id": "T4_BREAD",
+     "count": 12,
+     "name": "Pão",
+     "iv": 0
+    },
+    {
+     "id": "T6_MEAT",
+     "count": 24,
+     "name": "Carneiro Cru",
+     "iv": 40
+    },
+    {
+     "id": "T6_BUTTER",
+     "count": 6,
+     "name": "Manteiga de Ovelha",
+     "iv": 0
+    }
+   ],
+   "enchantments": [
+    {
+     "level": 1,
+     "id": "T6_MEAL_SANDWICH@1",
+     "sauceId": "T1_FISHSAUCE_LEVEL1",
+     "sauceCount": 30,
+     "saucePerItem": 3.0,
+     "sauceName": "Molho de Peixe Básico"
+    },
+    {
+     "level": 2,
+     "id": "T6_MEAL_SANDWICH@2",
+     "sauceId": "T1_FISHSAUCE_LEVEL2",
+     "sauceCount": 30,
+     "saucePerItem": 3.0,
+     "sauceName": "Molho de Peixe Extravagante"
+    },
+    {
+     "level": 3,
+     "id": "T6_MEAL_SANDWICH@3",
+     "sauceId": "T1_FISHSAUCE_LEVEL3",
+     "sauceCount": 30,
+     "saucePerItem": 3.0,
+     "sauceName": "Molho de Peixe Especial"
+    }
+   ]
+  },
+  {
+   "id": "T8_MEAL_SANDWICH",
+   "family": "sandwich",
+   "familyLabel": "Sanduíche",
+   "tier": 8,
+   "name": "Sanduíche de Carne",
+   "nameEn": "Beef Sandwich",
+   "amountCrafted": 10,
+   "craftFocus": 494,
+   "nutrition": 730,
+   "iv": 288,
+   "batchIv": 2880,
+   "ingredients": [
+    {
+     "id": "T4_BREAD",
+     "count": 36,
+     "name": "Pão",
+     "iv": 0
+    },
+    {
+     "id": "T8_MEAT",
+     "count": 72,
+     "name": "Carne Crua",
+     "iv": 40
+    },
+    {
+     "id": "T8_BUTTER",
+     "count": 18,
+     "name": "Manteiga de Vaca",
+     "iv": 0
+    }
+   ],
+   "enchantments": [
+    {
+     "level": 1,
+     "id": "T8_MEAL_SANDWICH@1",
+     "sauceId": "T1_FISHSAUCE_LEVEL1",
+     "sauceCount": 90,
+     "saucePerItem": 9.0,
+     "sauceName": "Molho de Peixe Básico"
+    },
+    {
+     "level": 2,
+     "id": "T8_MEAL_SANDWICH@2",
+     "sauceId": "T1_FISHSAUCE_LEVEL2",
+     "sauceCount": 90,
+     "saucePerItem": 9.0,
+     "sauceName": "Molho de Peixe Extravagante"
+    },
+    {
+     "level": 3,
+     "id": "T8_MEAL_SANDWICH@3",
+     "sauceId": "T1_FISHSAUCE_LEVEL3",
+     "sauceCount": 90,
+     "saucePerItem": 9.0,
+     "sauceName": "Molho de Peixe Especial"
+    }
+   ]
+  },
+  {
+   "id": "T3_MEAL_ROAST",
+   "family": "roast",
+   "familyLabel": "Assado",
+   "tier": 3,
+   "name": "Frango Assado",
+   "nameEn": "Roast Chicken",
+   "amountCrafted": 10,
+   "craftFocus": 58,
+   "nutrition": 87,
+   "iv": 64,
+   "batchIv": 640,
+   "ingredients": [
+    {
+     "id": "T3_MEAT",
+     "count": 8,
+     "name": "Galinha Crua",
+     "iv": 40
+    },
+    {
+     "id": "T2_BEAN",
+     "count": 4,
+     "name": "Feijões",
+     "iv": 40
+    },
+    {
+     "id": "T4_MILK",
+     "count": 4,
+     "name": "Leite de Cabra",
+     "iv": 40
+    }
+   ],
+   "enchantments": [
+    {
+     "level": 1,
+     "id": "T3_MEAL_ROAST@1",
+     "sauceId": "T1_FISHSAUCE_LEVEL1",
+     "sauceCount": 10,
+     "saucePerItem": 1.0,
+     "sauceName": "Molho de Peixe Básico"
+    },
+    {
+     "level": 2,
+     "id": "T3_MEAL_ROAST@2",
+     "sauceId": "T1_FISHSAUCE_LEVEL2",
+     "sauceCount": 10,
+     "saucePerItem": 1.0,
+     "sauceName": "Molho de Peixe Extravagante"
+    },
+    {
+     "level": 3,
+     "id": "T3_MEAL_ROAST@3",
+     "sauceId": "T1_FISHSAUCE_LEVEL3",
+     "sauceCount": 10,
+     "saucePerItem": 1.0,
+     "sauceName": "Molho de Peixe Especial"
+    }
+   ]
+  },
+  {
+   "id": "T5_MEAL_ROAST",
+   "family": "roast",
+   "familyLabel": "Assado",
+   "tier": 5,
+   "name": "Ganso Assado",
+   "nameEn": "Roast Goose",
+   "amountCrafted": 10,
+   "craftFocus": 176,
+   "nutrition": 262,
+   "iv": 192,
+   "batchIv": 1920,
+   "ingredients": [
+    {
+     "id": "T5_MEAT",
+     "count": 24,
+     "name": "Ganso Cru",
+     "iv": 40
+    },
+    {
+     "id": "T5_CABBAGE",
+     "count": 12,
+     "name": "Repolho",
+     "iv": 40
+    },
+    {
+     "id": "T6_MILK",
+     "count": 12,
+     "name": "Leite de Ovelha",
+     "iv": 40
+    }
+   ],
+   "enchantments": [
+    {
+     "level": 1,
+     "id": "T5_MEAL_ROAST@1",
+     "sauceId": "T1_FISHSAUCE_LEVEL1",
+     "sauceCount": 30,
+     "saucePerItem": 3.0,
+     "sauceName": "Molho de Peixe Básico"
+    },
+    {
+     "level": 2,
+     "id": "T5_MEAL_ROAST@2",
+     "sauceId": "T1_FISHSAUCE_LEVEL2",
+     "sauceCount": 30,
+     "saucePerItem": 3.0,
+     "sauceName": "Molho de Peixe Extravagante"
+    },
+    {
+     "level": 3,
+     "id": "T5_MEAL_ROAST@3",
+     "sauceId": "T1_FISHSAUCE_LEVEL3",
+     "sauceCount": 30,
+     "saucePerItem": 3.0,
+     "sauceName": "Molho de Peixe Especial"
+    }
+   ]
+  },
+  {
+   "id": "T7_MEAL_ROAST",
+   "family": "roast",
+   "familyLabel": "Assado",
+   "tier": 7,
+   "name": "Porco Assado",
+   "nameEn": "Roast Pork",
+   "amountCrafted": 10,
+   "craftFocus": 528,
+   "nutrition": 785,
+   "iv": 576,
+   "batchIv": 5760,
+   "ingredients": [
+    {
+     "id": "T7_MEAT",
+     "count": 72,
+     "name": "Porco Cru",
+     "iv": 40
+    },
+    {
+     "id": "T7_CORN",
+     "count": 36,
+     "name": "Fardo de Milho",
+     "iv": 40
+    },
+    {
+     "id": "T8_MILK",
+     "count": 36,
+     "name": "Leite de Vaca",
+     "iv": 40
+    }
+   ],
+   "enchantments": [
+    {
+     "level": 1,
+     "id": "T7_MEAL_ROAST@1",
+     "sauceId": "T1_FISHSAUCE_LEVEL1",
+     "sauceCount": 90,
+     "saucePerItem": 9.0,
+     "sauceName": "Molho de Peixe Básico"
+    },
+    {
+     "level": 2,
+     "id": "T7_MEAL_ROAST@2",
+     "sauceId": "T1_FISHSAUCE_LEVEL2",
+     "sauceCount": 90,
+     "saucePerItem": 9.0,
+     "sauceName": "Molho de Peixe Extravagante"
+    },
+    {
+     "level": 3,
+     "id": "T7_MEAL_ROAST@3",
+     "sauceId": "T1_FISHSAUCE_LEVEL3",
+     "sauceCount": 90,
+     "saucePerItem": 9.0,
+     "sauceName": "Molho de Peixe Especial"
+    }
+   ]
+  },
+  {
+   "id": "T2_MEAL_SALAD",
+   "family": "salad",
+   "familyLabel": "Salada",
+   "tier": 2,
+   "name": "Salada de Feijão",
+   "nameEn": "Bean Salad",
+   "amountCrafted": 10,
+   "craftFocus": 56,
+   "nutrition": 77,
+   "iv": 64,
+   "batchIv": 640,
+   "ingredients": [
+    {
+     "id": "T2_BEAN",
+     "count": 8,
+     "name": "Feijões",
+     "iv": 40
+    },
+    {
+     "id": "T1_CARROT",
+     "count": 8,
+     "name": "Cenouras",
+     "iv": 40
+    }
+   ],
+   "enchantments": [
+    {
+     "level": 1,
+     "id": "T2_MEAL_SALAD@1",
+     "sauceId": "T1_FISHSAUCE_LEVEL1",
+     "sauceCount": 10,
+     "saucePerItem": 1.0,
+     "sauceName": "Molho de Peixe Básico"
+    },
+    {
+     "level": 2,
+     "id": "T2_MEAL_SALAD@2",
+     "sauceId": "T1_FISHSAUCE_LEVEL2",
+     "sauceCount": 10,
+     "saucePerItem": 1.0,
+     "sauceName": "Molho de Peixe Extravagante"
+    },
+    {
+     "level": 3,
+     "id": "T2_MEAL_SALAD@3",
+     "sauceId": "T1_FISHSAUCE_LEVEL3",
+     "sauceCount": 10,
+     "saucePerItem": 1.0,
+     "sauceName": "Molho de Peixe Especial"
+    }
+   ]
+  },
+  {
+   "id": "T4_MEAL_SALAD",
+   "family": "salad",
+   "familyLabel": "Salada",
+   "tier": 4,
+   "name": "Salada de Nabo",
+   "nameEn": "Turnip Salad",
+   "amountCrafted": 10,
+   "craftFocus": 168,
+   "nutrition": 252,
+   "iv": 192,
+   "batchIv": 1920,
+   "ingredients": [
+    {
+     "id": "T4_TURNIP",
+     "count": 24,
+     "name": "Nabos",
+     "iv": 40
+    },
+    {
+     "id": "T3_WHEAT",
+     "count": 24,
+     "name": "Feixe de Trigo",
+     "iv": 40
+    }
+   ],
+   "enchantments": [
+    {
+     "level": 1,
+     "id": "T4_MEAL_SALAD@1",
+     "sauceId": "T1_FISHSAUCE_LEVEL1",
+     "sauceCount": 30,
+     "saucePerItem": 3.0,
+     "sauceName": "Molho de Peixe Básico"
+    },
+    {
+     "level": 2,
+     "id": "T4_MEAL_SALAD@2",
+     "sauceId": "T1_FISHSAUCE_LEVEL2",
+     "sauceCount": 30,
+     "saucePerItem": 3.0,
+     "sauceName": "Molho de Peixe Extravagante"
+    },
+    {
+     "level": 3,
+     "id": "T4_MEAL_SALAD@3",
+     "sauceId": "T1_FISHSAUCE_LEVEL3",
+     "sauceCount": 30,
+     "saucePerItem": 3.0,
+     "sauceName": "Molho de Peixe Especial"
+    }
+   ]
+  },
+  {
+   "id": "T6_MEAL_SALAD",
+   "family": "salad",
+   "familyLabel": "Salada",
+   "tier": 6,
+   "name": "Salada de Batata",
+   "nameEn": "Potato Salad",
+   "amountCrafted": 10,
+   "craftFocus": 504,
+   "nutrition": 756,
+   "iv": 576,
+   "batchIv": 5760,
+   "ingredients": [
+    {
+     "id": "T6_POTATO",
+     "count": 72,
+     "name": "Batatas",
+     "iv": 40
+    },
+    {
+     "id": "T5_CABBAGE",
+     "count": 72,
+     "name": "Repolho",
+     "iv": 40
+    }
+   ],
+   "enchantments": [
+    {
+     "level": 1,
+     "id": "T6_MEAL_SALAD@1",
+     "sauceId": "T1_FISHSAUCE_LEVEL1",
+     "sauceCount": 90,
+     "saucePerItem": 9.0,
+     "sauceName": "Molho de Peixe Básico"
+    },
+    {
+     "level": 2,
+     "id": "T6_MEAL_SALAD@2",
+     "sauceId": "T1_FISHSAUCE_LEVEL2",
+     "sauceCount": 90,
+     "saucePerItem": 9.0,
+     "sauceName": "Molho de Peixe Extravagante"
+    },
+    {
+     "level": 3,
+     "id": "T6_MEAL_SALAD@3",
+     "sauceId": "T1_FISHSAUCE_LEVEL3",
+     "sauceCount": 90,
+     "saucePerItem": 9.0,
+     "sauceName": "Molho de Peixe Especial"
+    }
+   ]
+  },
+  {
+   "id": "T1_MEAL_SOUP",
+   "family": "soup",
+   "familyLabel": "Sopa",
+   "tier": 1,
+   "name": "Sopa de Cenoura",
+   "nameEn": "Carrot Soup",
+   "amountCrafted": 10,
+   "craftFocus": 56,
+   "nutrition": 77,
+   "iv": 64,
+   "batchIv": 640,
+   "ingredients": [
+    {
+     "id": "T1_CARROT",
+     "count": 16,
+     "name": "Cenouras",
+     "iv": 40
+    }
+   ],
+   "enchantments": [
+    {
+     "level": 1,
+     "id": "T1_MEAL_SOUP@1",
+     "sauceId": "T1_FISHSAUCE_LEVEL1",
+     "sauceCount": 10,
+     "saucePerItem": 1.0,
+     "sauceName": "Molho de Peixe Básico"
+    },
+    {
+     "level": 2,
+     "id": "T1_MEAL_SOUP@2",
+     "sauceId": "T1_FISHSAUCE_LEVEL2",
+     "sauceCount": 10,
+     "saucePerItem": 1.0,
+     "sauceName": "Molho de Peixe Extravagante"
+    },
+    {
+     "level": 3,
+     "id": "T1_MEAL_SOUP@3",
+     "sauceId": "T1_FISHSAUCE_LEVEL3",
+     "sauceCount": 10,
+     "saucePerItem": 1.0,
+     "sauceName": "Molho de Peixe Especial"
+    }
+   ]
+  },
+  {
+   "id": "T3_MEAL_SOUP",
+   "family": "soup",
+   "familyLabel": "Sopa",
+   "tier": 3,
+   "name": "Sopa de Trigo",
+   "nameEn": "Wheat Soup",
+   "amountCrafted": 10,
+   "craftFocus": 168,
+   "nutrition": 252,
+   "iv": 192,
+   "batchIv": 1920,
+   "ingredients": [
+    {
+     "id": "T3_WHEAT",
+     "count": 48,
+     "name": "Feixe de Trigo",
+     "iv": 40
+    }
+   ],
+   "enchantments": [
+    {
+     "level": 1,
+     "id": "T3_MEAL_SOUP@1",
+     "sauceId": "T1_FISHSAUCE_LEVEL1",
+     "sauceCount": 30,
+     "saucePerItem": 3.0,
+     "sauceName": "Molho de Peixe Básico"
+    },
+    {
+     "level": 2,
+     "id": "T3_MEAL_SOUP@2",
+     "sauceId": "T1_FISHSAUCE_LEVEL2",
+     "sauceCount": 30,
+     "saucePerItem": 3.0,
+     "sauceName": "Molho de Peixe Extravagante"
+    },
+    {
+     "level": 3,
+     "id": "T3_MEAL_SOUP@3",
+     "sauceId": "T1_FISHSAUCE_LEVEL3",
+     "sauceCount": 30,
+     "saucePerItem": 3.0,
+     "sauceName": "Molho de Peixe Especial"
+    }
+   ]
+  },
+  {
+   "id": "T5_MEAL_SOUP",
+   "family": "soup",
+   "familyLabel": "Sopa",
+   "tier": 5,
+   "name": "Sopa de Repolho",
+   "nameEn": "Cabbage Soup",
+   "amountCrafted": 10,
+   "craftFocus": 504,
+   "nutrition": 756,
+   "iv": 576,
+   "batchIv": 5760,
+   "ingredients": [
+    {
+     "id": "T5_CABBAGE",
+     "count": 144,
+     "name": "Repolho",
+     "iv": 40
+    }
+   ],
+   "enchantments": [
+    {
+     "level": 1,
+     "id": "T5_MEAL_SOUP@1",
+     "sauceId": "T1_FISHSAUCE_LEVEL1",
+     "sauceCount": 90,
+     "saucePerItem": 9.0,
+     "sauceName": "Molho de Peixe Básico"
+    },
+    {
+     "level": 2,
+     "id": "T5_MEAL_SOUP@2",
+     "sauceId": "T1_FISHSAUCE_LEVEL2",
+     "sauceCount": 90,
+     "saucePerItem": 9.0,
+     "sauceName": "Molho de Peixe Extravagante"
+    },
+    {
+     "level": 3,
+     "id": "T5_MEAL_SOUP@3",
+     "sauceId": "T1_FISHSAUCE_LEVEL3",
+     "sauceCount": 90,
+     "saucePerItem": 9.0,
+     "sauceName": "Molho de Peixe Especial"
+    }
+   ]
+  }
+ ],
+ "foodFamilies": [
+  {
+   "id": "pie",
+   "name": "🥧 Tortas"
+  },
+  {
+   "id": "omelette",
+   "name": "🍳 Omeletes"
+  },
+  {
+   "id": "stew",
+   "name": "🍲 Guisados"
+  },
+  {
+   "id": "sandwich",
+   "name": "🥪 Sanduíches"
+  },
+  {
+   "id": "roast",
+   "name": "🍗 Assados"
+  },
+  {
+   "id": "salad",
+   "name": "🥗 Saladas"
+  },
+  {
+   "id": "soup",
+   "name": "🥣 Sopas"
+  }
+ ],
+ "butchering": [
+  {
+   "animalId": "T3_FARM_CHICKEN_GROWN",
+   "meatId": "T3_MEAT",
+   "animalName": "Galinha",
+   "meatName": "Galinha Crua",
+   "yield": 18,
+   "tier": 3
+  },
+  {
+   "animalId": "T4_FARM_GOAT_GROWN",
+   "meatId": "T4_MEAT",
+   "animalName": "Cabra",
+   "meatName": "Cabra Crua",
+   "yield": 18,
+   "tier": 4
+  },
+  {
+   "animalId": "T5_FARM_GOOSE_GROWN",
+   "meatId": "T5_MEAT",
+   "animalName": "Ganso",
+   "meatName": "Ganso Cru",
+   "yield": 18,
+   "tier": 5
+  },
+  {
+   "animalId": "T6_FARM_SHEEP_GROWN",
+   "meatId": "T6_MEAT",
+   "animalName": "Ovelha",
+   "meatName": "Carneiro Cru",
+   "yield": 18,
+   "tier": 6
+  },
+  {
+   "animalId": "T7_FARM_PIG_GROWN",
+   "meatId": "T7_MEAT",
+   "animalName": "Porco",
+   "meatName": "Porco Cru",
+   "yield": 18,
+   "tier": 7
+  },
+  {
+   "animalId": "T8_FARM_COW_GROWN",
+   "meatId": "T8_MEAT",
+   "animalName": "Vaca",
+   "meatName": "Carne Crua",
+   "yield": 18,
+   "tier": 8
+  }
+ ],
+ "foodProcessing": [
+  {
+   "id": "T3_FLOUR",
+   "fromId": "T3_WHEAT",
+   "count": 1,
+   "name": "Farinha",
+   "fromName": "Feixe de Trigo",
+   "building": "Moinho"
+  },
+  {
+   "id": "T4_BREAD",
+   "fromId": "T3_FLOUR",
+   "count": 1,
+   "name": "Pão",
+   "fromName": "Farinha",
+   "building": "Cozinha"
+  },
+  {
+   "id": "T4_BUTTER",
+   "fromId": "T4_MILK",
+   "count": 1,
+   "name": "Manteiga de Cabra",
+   "fromName": "Leite de Cabra",
+   "building": "Cozinha"
+  },
+  {
+   "id": "T6_BUTTER",
+   "fromId": "T6_MILK",
+   "count": 1,
+   "name": "Manteiga de Ovelha",
+   "fromName": "Leite de Ovelha",
+   "building": "Cozinha"
+  },
+  {
+   "id": "T8_BUTTER",
+   "fromId": "T8_MILK",
+   "count": 1,
+   "name": "Manteiga de Vaca",
+   "fromName": "Leite de Vaca",
+   "building": "Cozinha"
+  }
+ ]
 }

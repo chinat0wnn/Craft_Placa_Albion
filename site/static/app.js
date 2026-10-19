@@ -9,6 +9,13 @@ let refineTab = 'bar';
 let rankFilter = { cat: '', variant: '', piece: '', tier: '', ench: '', minVol: '0', quality: 'mix', onlyPriced: true, sort: 'profitDaily', sellPricing: 'spot', healthFilter: 'all' };
 let gearFilter = { cat: '', variant: 'SET1', piece: '', tmin: 4, quality: '1' };
 let histModalState = { itemId: null, loc: 'Black Market' };
+let foodTab = 'rank';
+let foodFilter = {
+  family: '', tier: '', ench: '', city: 'Caerleon', focus: false,
+  retRate: 0.248, feeFood: 465, sellLoc: '', sellPricing: 'spot',
+  autoArbitrage: true, onlyPriced: true, healthFilter: 'all', sort: 'profitDaily',
+  priceSubtab: 'meals'
+};
 
 const QUALITIES = [
   { q: 1, name: 'Normal', short: 'Q1', weight: 0.45 },
@@ -108,9 +115,10 @@ function setQP(id, loc, q, v) {
   }
 }
 
-function minBuy(id) {
+function minBuy(id, locs = null) {
   let best = null;
-  for (const c of GD.cities) { const v = getP(id, c); if (v && (!best || v < best.price)) best = { price: v, loc: c }; }
+  const list = locs || GD.cities;
+  for (const c of list) { const v = getP(id, c); if (v && (!best || v < best.price)) best = { price: v, loc: c }; }
   return best;
 }
 
@@ -275,6 +283,17 @@ function getItemDisplayInfo(id) {
         }
       }
     }
+  }
+  if (GD.itemNames && GD.itemNames[id]) {
+    const rawName = GD.itemNames[id];
+    const isFood = id.includes('_MEAL_');
+    const isMeat = id.includes('_MEAT');
+    const isFarm = id.includes('_FARM_');
+    const isSauce = id.includes('FISHSAUCE');
+    const isBreadFlourButter = id.includes('FLOUR') || id.includes('BREAD') || id.includes('BUTTER');
+    const sub = isFood ? 'Culinária · Comida' : isMeat ? 'Açougue · Carne' : isFarm ? 'Fazenda · Animal' : isSauce ? 'Pesca · Molho' : isBreadFlourButter ? 'Processamento' : 'Insumo de Culinária';
+    const tier = id.startsWith('T') ? id.split('_')[0] : '';
+    return { name: rawName, tier, sub, icon: itemIconUrl(id) };
   }
   return { name: id, tier: '', sub: 'Item de Mercado', icon: itemIconUrl(id) };
 }
@@ -942,6 +961,362 @@ function computePlan(bars, planks = null) {
   };
 }
 
+/* ---------------- culinária & alimentos (cálculos) ---------------- */
+function updateFoodReturnRate() {
+  if (foodFilter.city === 'Caerleon') {
+    foodFilter.retRate = foodFilter.focus ? 0.479 : 0.248;
+  } else if (foodFilter.city === 'Ilha' || foodFilter.city === 'Island') {
+    foodFilter.retRate = foodFilter.focus ? 0.435 : 0.0;
+  } else {
+    foodFilter.retRate = foodFilter.focus ? 0.435 : 0.152;
+  }
+}
+
+function getFoodIngredientBuy(id, reqQty = 1, options = {}) {
+  const allowAllCities = options.allowAllCities !== false;
+  const preferLoc = options.preferLoc || foodFilter.city || 'Caerleon';
+  const autoArbitrage = options.autoArbitrage !== false && (foodFilter.autoArbitrage !== false);
+  const taxBuy = ST.config.taxBuy || 0;
+
+  // 1. Compra Direta de Mercado
+  const searchCities = allowAllCities ? [...GD.cities, 'Caerleon'] : [preferLoc];
+  const spot = minBuy(id, searchCities);
+  const vol = spot ? (getVol(id, spot.loc) || getBestVol(id)) : null;
+  const vwap = (vol && vol.vwap > 0) ? vol.vwap : null;
+  const mode = ST.config.materialPricing || 'smart';
+
+  let effDirectPrice = spot ? spot.price : null;
+  let slippageRisk = false;
+  let reason = '';
+
+  if (spot && vwap) {
+    if (spot.price < vwap * 0.82) {
+      slippageRisk = true;
+      reason = `Oferta spot (${fmt(spot.price)}s) é >18% abaixo do VWAP (${fmt(vwap)}s). Risco de profundidade.`;
+    } else if (reqQty >= 50 && vwap > spot.price * 1.08) {
+      slippageRisk = true;
+      reason = `Lote grande (${fmt(Math.ceil(reqQty))} un.): menor oferta é ${fmt(spot.price)}s, VWAP é ${fmt(vwap)}s.`;
+    }
+    if (mode === 'vwap') {
+      effDirectPrice = vwap;
+    } else if (mode === 'smart' && (spot.price < vwap * 0.82 || (reqQty >= 50 && vwap > spot.price))) {
+      effDirectPrice = vwap;
+    }
+  }
+
+  // 2. Arbitragem com Açougue e Processamento
+  let altMethod = null;
+  if (autoArbitrage) {
+    // A) Açougue: carne crua (T3_MEAT .. T8_MEAT)
+    const butch = GD.butchering ? GD.butchering.find(b => b.meatId === id) : null;
+    if (butch) {
+      const animalsNeeded = reqQty / butch.yield;
+      const animalBuy = getFoodIngredientBuy(butch.animalId, animalsNeeded, { ...options, autoArbitrage: false });
+      if (animalBuy && animalBuy.price > 0) {
+        const butcherCostPerMeat = animalBuy.price / butch.yield;
+        altMethod = {
+          method: 'butcher',
+          name: `Abate de ${butch.animalName}`,
+          sourceId: butch.animalId,
+          sourceName: butch.animalName,
+          yield: butch.yield,
+          sourcePrice: animalBuy.price,
+          sourceLoc: animalBuy.loc,
+          costPerUnit: butcherCostPerMeat,
+          savings: effDirectPrice ? (effDirectPrice - butcherCostPerMeat) : null
+        };
+      }
+    }
+
+    // B) Processamento: Farinha, Pão, Manteiga
+    const proc = GD.foodProcessing ? GD.foodProcessing.find(p => p.id === id) : null;
+    if (proc) {
+      const fromBuy = getFoodIngredientBuy(proc.fromId, reqQty, { ...options, autoArbitrage: false });
+      if (fromBuy && fromBuy.price > 0) {
+        const procCostPerUnit = fromBuy.price / proc.count;
+        altMethod = {
+          method: 'process',
+          name: `${proc.building}: ${proc.fromName}`,
+          sourceId: proc.fromId,
+          sourceName: proc.fromName,
+          yield: proc.count,
+          sourcePrice: fromBuy.price,
+          sourceLoc: fromBuy.loc,
+          costPerUnit: procCostPerUnit,
+          savings: effDirectPrice ? (effDirectPrice - procCostPerUnit) : null
+        };
+      }
+    }
+  }
+
+  if (altMethod && (effDirectPrice === null || altMethod.costPerUnit < effDirectPrice)) {
+    return {
+      id,
+      method: altMethod.method,
+      methodLabel: altMethod.name,
+      price: altMethod.costPerUnit,
+      spotPrice: altMethod.costPerUnit,
+      loc: altMethod.sourceLoc,
+      sourceId: altMethod.sourceId,
+      sourceName: altMethod.sourceName,
+      directPrice: effDirectPrice,
+      savings: altMethod.savings,
+      isArbitrage: true,
+      slippageRisk: false,
+      reason: ''
+    };
+  }
+
+  if (spot) {
+    return {
+      id,
+      method: 'market',
+      methodLabel: 'Mercado',
+      price: effDirectPrice,
+      spotPrice: spot.price,
+      vwap,
+      loc: spot.loc,
+      isArbitrage: false,
+      slippageRisk,
+      reason
+    };
+  }
+
+  return null;
+}
+
+function computeMealItem(foodId, enchLevel = 0, options = {}) {
+  const f = GD.foods ? GD.foods.find(item => item.id === foodId) : null;
+  if (!f) return null;
+
+  const ench = Number(enchLevel) || 0;
+  const fullItemId = ench > 0 ? `${foodId}@${ench}` : foodId;
+  const enchData = ench > 0 && f.enchantments ? f.enchantments.find(e => e.level === ench) : null;
+
+  const city = options.city || foodFilter.city || 'Caerleon';
+  const focus = options.focus !== undefined ? options.focus : foodFilter.focus;
+  const feeFood = options.feeFood !== undefined ? options.feeFood : (foodFilter.feeFood || ST.config.feeCraft || 465);
+  const taxBuy = ST.config.taxBuy || 0;
+  const taxSell = ST.config.taxSell || 0.065;
+  const sellPricingMode = options.sellPricing || foodFilter.sellPricing || 'spot';
+  const filterSellLoc = options.sellLoc || foodFilter.sellLoc || '';
+
+  // Taxa de retorno de recursos
+  let ret = options.retRate !== undefined ? options.retRate : foodFilter.retRate;
+  if (ret === null || ret === undefined) {
+    if (city === 'Caerleon') ret = focus ? 0.479 : 0.248;
+    else if (city === 'Ilha' || city === 'Island') ret = focus ? 0.435 : 0.0;
+    else ret = focus ? 0.435 : 0.152;
+  }
+
+  const amountCrafted = f.amountCrafted || 10;
+
+  // Insumos base por lote de 10
+  let batchIngCost = 0;
+  let hasMissingIng = false;
+  const ingDetails = [];
+
+  for (const ing of f.ingredients) {
+    const buy = getFoodIngredientBuy(ing.id, ing.count, options);
+    const effCount = ing.count * (1 - ret);
+    if (!buy || buy.price === null) {
+      hasMissingIng = true;
+      ingDetails.push({ ...ing, buy: null, effCount, costPerUnit: null, totalCost: null });
+    } else {
+      const ingCost = effCount * buy.price * (1 + taxBuy);
+      batchIngCost += ingCost;
+      ingDetails.push({ ...ing, buy, effCount, costPerUnit: buy.price, totalCost: ingCost });
+    }
+  }
+
+  // Molho de peixe (para encantamentos .1, .2, .3) — 0% de retorno de recursos
+  let sauceCost = 0;
+  let sauceDetails = null;
+  if (ench > 0 && enchData) {
+    const sId = enchData.sauceId;
+    const sCount = enchData.sauceCount;
+    const sBuy = getFoodIngredientBuy(sId, sCount, { ...options, autoArbitrage: false });
+    if (!sBuy || sBuy.price === null) {
+      hasMissingIng = true;
+      sauceDetails = { id: sId, name: enchData.sauceName, count: sCount, perMeal: enchData.saucePerItem, buy: null, costPerUnit: null, totalCost: null };
+    } else {
+      sauceCost = sCount * sBuy.price * (1 + taxBuy);
+      sauceDetails = { id: sId, name: enchData.sauceName, count: sCount, perMeal: enchData.saucePerItem, buy: sBuy, costPerUnit: sBuy.price, totalCost: sauceCost };
+    }
+  }
+
+  // Taxa da estação (Cozinha) por lote
+  const batchIv = f.batchIv || (f.iv * amountCrafted);
+  const batchStationFee = batchIv * 0.1125 * (feeFood / 100);
+  const unitStationFee = batchStationFee / amountCrafted;
+
+  // Custo por lote e custo unitário
+  const batchCost = hasMissingIng ? null : (batchIngCost + sauceCost + batchStationFee);
+  const unitCost = batchCost !== null ? (batchCost / amountCrafted) : null;
+
+  // Venda e liquidez
+  let bestSell = null;
+  const searchSaleLocs = filterSellLoc ? [filterSellLoc] : GD.saleLocs;
+  for (const loc of searchSaleLocs) {
+    const p = getP(fullItemId, loc);
+    if (p && (!bestSell || p > bestSell.price)) {
+      bestSell = { price: p, loc };
+    }
+  }
+
+  const spotPrice = bestSell ? bestSell.price : null;
+  const sellLoc = bestSell ? bestSell.loc : (filterSellLoc || '—');
+  const vol = spotPrice ? (getVol(fullItemId, sellLoc) || getBestVol(fullItemId)) : null;
+  const health = analyzePriceHealth(spotPrice, vol);
+
+  let effectiveSellPrice = spotPrice;
+  if (vol && vol.vwap > 0) {
+    if (sellPricingMode === 'vwap') effectiveSellPrice = vol.vwap;
+    else if (sellPricingMode === 'safe') effectiveSellPrice = spotPrice ? Math.min(spotPrice, vol.vwap) : vol.vwap;
+    else if (sellPricingMode === 'smart' && health.status === 'inflated') effectiveSellPrice = vol.vwap;
+  }
+
+  const revenue = effectiveSellPrice ? effectiveSellPrice * (1 - taxSell) : null;
+  const profit = (unitCost !== null && revenue !== null) ? revenue - unitCost : null;
+  const margin = (profit !== null && unitCost && unitCost > 0) ? profit / unitCost : null;
+  const dailyVol = vol ? (vol.daily !== undefined ? vol.daily : 0) : null;
+  const profitDaily = (dailyVol !== null) ? ((profit !== null && profit > 0) ? profit * dailyVol : (profit !== null && profit < 0 ? profit : 0)) : profit;
+
+  const focusCostPerMeal = (f.craftFocus || 0) / amountCrafted;
+
+  return {
+    id: fullItemId,
+    baseId: foodId,
+    name: ench > 0 ? `${f.name} .${ench}` : f.name,
+    nameEn: f.nameEn,
+    family: f.family,
+    familyLabel: f.familyLabel,
+    tier: f.tier,
+    ench,
+    amountCrafted,
+    batchIv,
+    unitIv: f.iv,
+    ingredients: ingDetails,
+    sauce: sauceDetails,
+    batchIngCost,
+    sauceCost,
+    batchStationFee,
+    unitStationFee,
+    batchCost,
+    unitCost,
+    hasMissingIng,
+    spotPrice,
+    effectiveSellPrice,
+    sellLoc,
+    vol,
+    dailyVol,
+    health,
+    revenue,
+    profit,
+    margin,
+    profitDaily,
+    focusCostPerMeal,
+    city,
+    focus,
+    retRate: ret
+  };
+}
+
+function computeFoodPlan() {
+  const plan = ST.foodPlan || [];
+  const rows = plan.map((r, idx) => {
+    const [baseId, enchStr] = r.id.split('@');
+    const ench = enchStr ? Number(enchStr) : 0;
+    const it = computeMealItem(baseId, ench);
+    const batches = Number(r.batches) || 1;
+    const totalUnits = batches * (it ? it.amountCrafted : 10);
+    const totalCost = (it && it.batchCost !== null) ? it.batchCost * batches : null;
+    const totalRevenue = (it && it.revenue !== null) ? it.revenue * totalUnits : null;
+    const totalProfit = (it && it.profit !== null) ? it.profit * totalUnits : null;
+    const totalFocus = (it && foodFilter.focus) ? (it.focusCostPerMeal * totalUnits) : 0;
+    return { ...r, idx, it, batches, totalUnits, totalCost, totalRevenue, totalProfit, totalFocus };
+  });
+
+  // Lista consolidada de compras
+  const buyItems = {};
+  let totalFees = 0;
+  let totalMissing = 0;
+
+  for (const row of rows) {
+    if (!row.it) continue;
+    totalFees += (row.it.batchStationFee || 0) * row.batches;
+    if (row.it.hasMissingIng) totalMissing++;
+
+    for (const ing of row.it.ingredients) {
+      const grossNeeded = ing.count * row.batches;
+      const netToBuy = ing.effCount * row.batches;
+      const key = ing.id;
+      if (!buyItems[key]) {
+        const dInfo = getItemDisplayInfo(ing.id);
+        buyItems[key] = {
+          id: ing.id,
+          name: dInfo.name,
+          icon: dInfo.icon,
+          tier: dInfo.tier,
+          grossQty: 0,
+          netQty: 0,
+          buy: ing.buy,
+          costPerUnit: ing.costPerUnit,
+          totalCost: 0
+        };
+      }
+      buyItems[key].grossQty += grossNeeded;
+      buyItems[key].netQty += netToBuy;
+      if (ing.totalCost !== null) {
+        buyItems[key].totalCost += ing.totalCost * row.batches;
+      }
+    }
+
+    if (row.it.sauce) {
+      const s = row.it.sauce;
+      const key = s.id;
+      if (!buyItems[key]) {
+        const dInfo = getItemDisplayInfo(s.id);
+        buyItems[key] = {
+          id: s.id,
+          name: dInfo.name,
+          icon: dInfo.icon,
+          tier: dInfo.tier,
+          grossQty: 0,
+          netQty: 0,
+          buy: s.buy,
+          costPerUnit: s.costPerUnit,
+          totalCost: 0
+        };
+      }
+      buyItems[key].grossQty += s.count * row.batches;
+      buyItems[key].netQty += s.count * row.batches;
+      if (s.totalCost !== null) {
+        buyItems[key].totalCost += s.totalCost * row.batches;
+      }
+    }
+  }
+
+  const shoppingList = Object.values(buyItems).sort((a, b) => (b.totalCost || 0) - (a.totalCost || 0));
+  const totalMeals = rows.reduce((s, r) => s + r.totalUnits, 0);
+  const totalInvestment = rows.reduce((s, r) => s + (r.totalCost || 0), 0);
+  const totalRevenue = rows.reduce((s, r) => s + (r.totalRevenue || 0), 0);
+  const totalProfit = rows.reduce((s, r) => s + (r.totalProfit || 0), 0);
+  const totalFocus = rows.reduce((s, r) => s + r.totalFocus, 0);
+
+  return {
+    rows,
+    shoppingList,
+    totalMeals,
+    totalInvestment,
+    totalRevenue,
+    totalProfit,
+    totalFocus,
+    totalFees,
+    totalMissing
+  };
+}
+
 /* ---------------- persistência ---------------- */
 let saveTimer = null;
 function save() {
@@ -961,7 +1336,7 @@ function render() {
   const active = document.activeElement;
   const focusKey = active && active.dataset ? active.dataset.fk : null;
   const scrollers = [...document.querySelectorAll('.tablewrap')].map(e => [e.scrollTop, e.scrollLeft]);
-  const views = { plan: viewPlan, rank: viewRank, refine: viewRefine, prices: viewPrices, config: viewConfig };
+  const views = { plan: viewPlan, rank: viewRank, refine: viewRefine, food: viewFood, prices: viewPrices, config: viewConfig };
   $('#view').innerHTML = views[VIEW]();
   document.querySelectorAll('.tablewrap').forEach((e, i) => { if (scrollers[i]) [e.scrollTop, e.scrollLeft] = scrollers[i]; });
   if (focusKey) { const el = document.querySelector(`[data-fk="${CSS.escape(focusKey)}"]`); if (el) { el.focus(); if (el.select) el.select(); } }
@@ -1410,6 +1785,510 @@ function priceTable(rows, locs, extraHead = '', extra = () => '', q = 1) {
         <td class="pos">${vals.length ? fmt(Math.min(...vals)) : '—'}</td><td class="best">${vals.length ? fmt(Math.max(...vals)) : '—'}</td></tr>`;
     }).join('')}</table></div>`;
 }
+/* ---------------- culinária & alimentos (telas & interface) ---------------- */
+function viewFood() {
+  const tabs = [
+    ['rank', '🏆 Ranking de Comidas'],
+    ['processing', '🔪 Açougue & Insumos'],
+    ['plan', `📋 Planejador (${(ST.foodPlan || []).length})`],
+    ['prices', '📈 Cotações de Culinária']
+  ];
+  return `
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:12px">
+      <div>
+        <h2>🍲 Culinária · Craft de Comidas Meta</h2>
+        <div class="muted">Cálculo de produção para as 21 comidas meta (.0 a .3) com rendimento de 10 un./lote, bônus de Caerleon/Ilha, taxas e arbitragem de açougue.</div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button id="fetchFoodPrices" class="btn" style="font-size:12px;padding:6px 12px">🔄 Atualizar Preços de Comida</button>
+        <button id="fetchFoodVolumes" class="ghost" style="font-size:12px;padding:6px 12px">📊 Atualizar Volumes & Histórico</button>
+      </div>
+    </div>
+    <div class="subtabs">
+      ${tabs.map(([id, label]) => `<button class="${foodTab === id ? 'active' : ''}" data-foodtab="${id}">${label}</button>`).join('')}
+    </div>
+    ${foodTab === 'rank' ? viewFoodRank() :
+      foodTab === 'processing' ? viewFoodProcessing() :
+      foodTab === 'plan' ? viewFoodPlan() :
+      viewFoodPrices()}
+  `;
+}
+
+function viewFoodRank() {
+  const f = foodFilter;
+  const allMeals = [];
+  
+  if (GD.foods) {
+    for (const food of GD.foods) {
+      if (f.family && food.family !== f.family) continue;
+      if (f.tier && String(food.tier) !== String(f.tier)) continue;
+
+      const enchLevels = f.ench !== '' ? [Number(f.ench)] : [0, 1, 2, 3];
+      for (const e of enchLevels) {
+        const item = computeMealItem(food.id, e);
+        if (!item) continue;
+        if (f.onlyPriced && (item.unitCost === null || item.spotPrice === null)) continue;
+        if (f.healthFilter && f.healthFilter !== 'all' && item.health && item.health.status !== f.healthFilter) continue;
+        allMeals.push(item);
+      }
+    }
+  }
+
+  // Ordenação
+  allMeals.sort((a, b) => {
+    if (f.sort === 'profit') return (b.profit || -1e9) - (a.profit || -1e9);
+    if (f.sort === 'margin') return (b.margin || -1e9) - (a.margin || -1e9);
+    if (f.sort === 'vol') return (b.dailyVol || 0) - (a.dailyVol || 0);
+    return (b.profitDaily || -1e9) - (a.profitDaily || -1e9);
+  });
+
+  const profitableCount = allMeals.filter(m => m.profit > 0).length;
+  const bestDaily = allMeals.length ? allMeals[0] : null;
+  const bestMargin = [...allMeals].sort((a, b) => (b.margin || -1e9) - (a.margin || -1e9))[0] || null;
+
+  return `
+    <div class="card toolbar" style="margin-top:8px">
+      <label>Família:
+        <select data-ff="family">
+          <option value="">Todas as Comidas</option>
+          ${(GD.foodFamilies || []).map(fam => `<option value="${fam.id}"${f.family === fam.id ? ' selected' : ''}>${fam.name}</option>`).join('')}
+        </select>
+      </label>
+      <label>Tier:
+        <select data-ff="tier">
+          <option value="">Todos</option>
+          ${[1, 2, 3, 4, 5, 6, 7, 8].map(t => `<option value="${t}"${String(f.tier) === String(t) ? ' selected' : ''}>T${t}</option>`).join('')}
+        </select>
+      </label>
+      <label>Encantamento:
+        <select data-ff="ench">
+          <option value="">Todos (.0 a .3)</option>
+          <option value="0"${f.ench === '0' ? ' selected' : ''}>.0 (Comum)</option>
+          <option value="1"${f.ench === '1' ? ' selected' : ''}>.1 (Molho Básico)</option>
+          <option value="2"${f.ench === '2' ? ' selected' : ''}>.2 (Molho Extravagante)</option>
+          <option value="3"${f.ench === '3' ? ' selected' : ''}>.3 (Molho Especial)</option>
+        </select>
+      </label>
+      <label>Local de Produção:
+        <select data-ff="city">
+          <option value="Caerleon"${f.city === 'Caerleon' ? ' selected' : ''}>Caerleon (Bônus Culinária: 24.8%)</option>
+          <option value="Ilha"${f.city === 'Ilha' || f.city === 'Island' ? ' selected' : ''}>Ilha Particular (0.0% s/ foco)</option>
+          <option value="Thetford"${f.city === 'Thetford' ? ' selected' : ''}>Thetford (15.2%)</option>
+          <option value="Martlock"${f.city === 'Martlock' ? ' selected' : ''}>Martlock (15.2%)</option>
+          <option value="Bridgewatch"${f.city === 'Bridgewatch' ? ' selected' : ''}>Bridgewatch (15.2%)</option>
+          <option value="Lymhurst"${f.city === 'Lymhurst' ? ' selected' : ''}>Lymhurst (15.2%)</option>
+          <option value="Fort Sterling"${f.city === 'Fort Sterling' ? ' selected' : ''}>Fort Sterling (15.2%)</option>
+        </select>
+      </label>
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;flex-direction:row;margin-top:14px">
+        <input type="checkbox" data-ff="focus"${f.focus ? ' checked' : ''}>
+        <span>Usar Foco (${f.city === 'Caerleon' ? '47.9%' : '43.5%'})</span>
+      </label>
+      <label>Retorno RRF:
+        <input class="num" type="number" step="0.1" min="0" max="100" style="width:70px" value="${(f.retRate * 100).toFixed(1)}" data-ff="retRate">
+      </label>
+      <label>Taxa Cozinha:
+        <input class="num" type="number" min="0" max="5000" style="width:70px" value="${f.feeFood}" data-ff="feeFood" title="Taxa por 100 de nutrição">
+      </label>
+      <label>Venda:
+        <select data-ff="sellLoc">
+          <option value="">Melhor Cidade</option>
+          ${GD.saleLocs.map(l => `<option value="${l}"${f.sellLoc === l ? ' selected' : ''}>${locName(l)}</option>`).join('')}
+        </select>
+      </label>
+      <label>Precificação:
+        <select data-ff="sellPricing">
+          <option value="spot"${f.sellPricing === 'spot' ? ' selected' : ''}>Preço Spot</option>
+          <option value="smart"${f.sellPricing === 'smart' ? ' selected' : ''}>Inteligente (Anti-inflado)</option>
+          <option value="safe"${f.sellPricing === 'safe' ? ' selected' : ''}>Seguro (Min Spot/VWAP)</option>
+          <option value="vwap"${f.sellPricing === 'vwap' ? ' selected' : ''}>VWAP (Média 7d)</option>
+        </select>
+      </label>
+      <label>Ordenar por:
+        <select data-ff="sort">
+          <option value="profitDaily"${f.sort === 'profitDaily' ? ' selected' : ''}>Lucro Diário Est.</option>
+          <option value="profit"${f.sort === 'profit' ? ' selected' : ''}>Lucro Unitário</option>
+          <option value="margin"${f.sort === 'margin' ? ' selected' : ''}>Margem (%)</option>
+          <option value="vol"${f.sort === 'vol' ? ' selected' : ''}>Demanda Diária</option>
+        </select>
+      </label>
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;flex-direction:row;margin-top:14px">
+        <input type="checkbox" data-ff="autoArbitrage"${f.autoArbitrage ? ' checked' : ''}>
+        <span title="Compara automaticamente carne do açougue vs carne pronta, farinha do moinho vs mercado">Auto-Arbitragem Insumos</span>
+      </label>
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;flex-direction:row;margin-top:14px">
+        <input type="checkbox" data-ff="onlyPriced"${f.onlyPriced ? ' checked' : ''}>
+        <span>Apenas c/ Preço</span>
+      </label>
+    </div>
+
+    <div class="cards">
+      <div class="stat"><div class="label">Comidas Avaliadas</div><div class="value">${allMeals.length}</div></div>
+      <div class="stat"><div class="label">Lucro Positivo</div><div class="value pos">${profitableCount}</div></div>
+      <div class="stat"><div class="label">Maior Lucro Diário Est.</div><div class="value pos">${bestDaily ? fmt(bestDaily.profitDaily) + 's' : '—'}</div></div>
+      <div class="stat"><div class="label">Maior Margem</div><div class="value pos">${bestMargin && bestMargin.margin ? pct(bestMargin.margin) : '—'}</div></div>
+    </div>
+
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr>
+            <th class="l">Comida</th>
+            <th>Tier</th>
+            <th class="l">Insumos por Lote (10 un.)</th>
+            <th>Molho de Peixe</th>
+            <th>Custo Unit.</th>
+            <th>Melhor Venda</th>
+            <th>Demanda / Saúde</th>
+            <th>Lucro Unit.</th>
+            <th>Margem</th>
+            <th>Lucro Diário Est.</th>
+            <th>Ação</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${allMeals.map(m => {
+            const sauceChip = m.sauce ? `<span class="food-chip"><img src="${itemIconUrl(m.sauce.id)}"> ${m.sauce.count}x (${fmt(m.sauce.totalCost)}s)</span>` : '<span class="muted">—</span>';
+            const ingsChips = m.ingredients.map(ing => {
+              const arbTag = ing.buy && ing.buy.isArbitrage ? ' <span class="tag step" title="Obtido via abate ou processamento">arbitrado</span>' : '';
+              return `<span class="food-chip" title="${ing.name}: ${ing.count} un. brutas (${fmt(ing.effCount, 1)} líquidas c/ retorno) — ${ing.costPerUnit ? fmt(ing.costPerUnit) + 's/un' : 's/ preço'}"><img src="${itemIconUrl(ing.id)}"> ${ing.count}x${arbTag}</span>`;
+            }).join(' ');
+            return `
+              <tr>
+                <td class="l" style="display:flex;align-items:center;gap:8px">
+                  <img src="${itemIconUrl(m.id)}" class="food-icon" alt="">
+                  <div>
+                    <div style="font-weight:600">${esc(m.name)}</div>
+                    <div class="muted">${esc(m.familyLabel)} · ${esc(m.nameEn)}</div>
+                  </div>
+                </td>
+                <td><span class="tag ${m.family}">${m.tier}.${m.ench}</span></td>
+                <td class="l">${ingsChips}</td>
+                <td>${sauceChip}</td>
+                <td><b>${fmt(m.unitCost)}</b>s</td>
+                <td>
+                  ${m.spotPrice ? `<b>${fmt(m.spotPrice)}</b>s <span class="muted">(${locName(m.sellLoc)})</span>` : '<span class="muted">—</span>'}
+                </td>
+                <td>
+                  <div style="display:inline-flex;gap:4px;align-items:center">
+                    ${volBadge(m.vol, m.sellLoc, m.id, m.sellLoc)}
+                    ${priceHealthBadge(m.spotPrice, m.vol, m.id, m.sellLoc)}
+                  </div>
+                </td>
+                <td class="${cls(m.profit)}">${fmt(m.profit)}s</td>
+                <td><span class="pill ${m.margin > 0.15 ? 'win' : m.margin > 0 ? 'tie' : 'neg'}">${pct(m.margin)}</span></td>
+                <td class="${cls(m.profitDaily)}"><b>${fmt(m.profitDaily)}</b>s</td>
+                <td>
+                  <button class="ghost" style="font-size:11px;padding:3px 8px" data-addfood="${m.id}" title="Adicionar 1 lote (10 comidas) ao Planejador de Culinária">+ Planejador</button>
+                </td>
+              </tr>
+            `;
+          }).join('')}
+          ${!allMeals.length ? '<tr><td colspan="11" class="empty">Nenhuma comida encontrada com os filtros selecionados.</td></tr>' : ''}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function viewFoodProcessing() {
+  const butchList = (GD.butchering || []).map(b => {
+    const animalBuy = getFoodIngredientBuy(b.animalId, 1, { autoArbitrage: false });
+    const meatBuy = getFoodIngredientBuy(b.meatId, 18, { autoArbitrage: false });
+    const animalPrice = animalBuy ? animalBuy.price : null;
+    const meatDirectPrice = meatBuy ? meatBuy.price : null;
+    const meatViaButcher = animalPrice ? (animalPrice / b.yield) : null;
+    const diffPerMeat = (meatDirectPrice !== null && meatViaButcher !== null) ? (meatDirectPrice - meatViaButcher) : null;
+    const diffPct = (diffPerMeat !== null && meatDirectPrice > 0) ? (diffPerMeat / meatDirectPrice) : null;
+    const totalSavingsPerAnimal = diffPerMeat !== null ? (diffPerMeat * b.yield) : null;
+    return { ...b, animalBuy, meatBuy, animalPrice, meatDirectPrice, meatViaButcher, diffPerMeat, diffPct, totalSavingsPerAnimal };
+  });
+
+  const procList = (GD.foodProcessing || []).map(p => {
+    const rawBuy = getFoodIngredientBuy(p.fromId, 1, { autoArbitrage: false });
+    const readyBuy = getFoodIngredientBuy(p.id, 1, { autoArbitrage: false });
+    const rawPrice = rawBuy ? rawBuy.price : null;
+    const readyPrice = readyBuy ? readyBuy.price : null;
+    const costViaProc = rawPrice ? (rawPrice / p.count) : null;
+    const diff = (readyPrice !== null && costViaProc !== null) ? (readyPrice - costViaProc) : null;
+    const diffPct = (diff !== null && readyPrice > 0) ? (diff / readyPrice) : null;
+    return { ...p, rawBuy, readyBuy, rawPrice, readyPrice, costViaProc, diff, diffPct };
+  });
+
+  return `
+    <div class="card" style="margin-top:12px">
+      <h3>🔪 Açougueiro · Arbitragem de Carnes (Animal Vivo vs Carne Crua)</h3>
+      <div class="muted" style="margin-bottom:12px">
+        No Albion, abater 1 animal adulto no Açougueiro gera <b>18 unidades de carne crua</b>. Compare se vale a pena comprar o animal vivo ou comprar a carne pronta no mercado.
+      </div>
+      <div class="tablewrap">
+        <table>
+          <thead>
+            <tr>
+              <th class="l">Animal Vivo (Fazenda)</th>
+              <th>Preço Animal</th>
+              <th>Rendimento</th>
+              <th>Custo Carne (Abate)</th>
+              <th class="l">Carne Pronta (Mercado)</th>
+              <th>Preço Carne Mercado</th>
+              <th>Economia / Carne</th>
+              <th>Economia / Animal</th>
+              <th>Veredito</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${butchList.map(b => {
+              const isWin = b.diffPerMeat > 0;
+              return `
+                <tr>
+                  <td class="l" style="display:flex;align-items:center;gap:6px">
+                    <img src="${itemIconUrl(b.animalId)}" class="food-icon" alt="">
+                    <b>${esc(b.animalName)}</b> <span class="muted">(T${b.tier})</span>
+                  </td>
+                  <td>${b.animalPrice ? `<b>${fmt(b.animalPrice)}</b>s <span class="muted">(${locName(b.animalBuy.loc)})</span>` : '<span class="muted">—</span>'}</td>
+                  <td>18x carnes</td>
+                  <td class="${isWin ? 'pos' : ''}"><b>${fmt(b.meatViaButcher, 1)}</b>s</td>
+                  <td class="l">
+                    <img src="${itemIconUrl(b.meatId)}" style="width:20px;height:20px;vertical-align:middle">
+                    ${esc(b.meatName)}
+                  </td>
+                  <td>${b.meatDirectPrice ? `<b>${fmt(b.meatDirectPrice)}</b>s <span class="muted">(${locName(b.meatBuy.loc)})</span>` : '<span class="muted">—</span>'}</td>
+                  <td class="${cls(b.diffPerMeat)}">${b.diffPerMeat !== null ? fmt(b.diffPerMeat, 1) + 's' : '—'}</td>
+                  <td class="${cls(b.totalSavingsPerAnimal)}">${b.totalSavingsPerAnimal !== null ? fmt(b.totalSavingsPerAnimal) + 's' : '—'}</td>
+                  <td>
+                    ${b.diffPct !== null ?
+                      (b.diffPct > 0.05 ? `<span class="arb-badge arb-win">🔪 Abater! Economia de ${pct(b.diffPct)}</span>` :
+                       b.diffPct < -0.05 ? `<span class="arb-badge arb-loss">Comprar pronta (+${pct(-b.diffPct)} mais cara no abate)</span>` :
+                       `<span class="arb-badge arb-loss">Empate de preço (~${pct(b.diffPct)})</span>`)
+                      : '<span class="muted">Sem dados</span>'}
+                  </td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <h3>🌾 Moinho, Padaria & Laticínios (Processamento Intermediário)</h3>
+      <div class="muted" style="margin-bottom:12px">
+        Conversões diretas: 1 Trigo = 1 Farinha (Moinho); 1 Farinha = 1 Pão (Cozinha); 1 Leite = 1 Manteiga (Cozinha).
+      </div>
+      <div class="tablewrap">
+        <table>
+          <thead>
+            <tr>
+              <th class="l">Item Processado</th>
+              <th>Estação</th>
+              <th class="l">Matéria-Prima</th>
+              <th>Preço Matéria-Prima</th>
+              <th>Preço Item Pronto</th>
+              <th>Economia / Un.</th>
+              <th>Veredito</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${procList.map(p => {
+              const isWin = p.diff > 0;
+              return `
+                <tr>
+                  <td class="l" style="display:flex;align-items:center;gap:6px">
+                    <img src="${itemIconUrl(p.id)}" class="food-icon" alt="">
+                    <b>${esc(p.name)}</b>
+                  </td>
+                  <td><span class="tag step">${esc(p.building)}</span></td>
+                  <td class="l">
+                    <img src="${itemIconUrl(p.fromId)}" style="width:20px;height:20px;vertical-align:middle">
+                    ${esc(p.fromName)}
+                  </td>
+                  <td>${p.rawPrice ? `<b>${fmt(p.rawPrice)}</b>s <span class="muted">(${locName(p.rawBuy.loc)})</span>` : '<span class="muted">—</span>'}</td>
+                  <td>${p.readyPrice ? `<b>${fmt(p.readyPrice)}</b>s <span class="muted">(${locName(p.readyBuy.loc)})</span>` : '<span class="muted">—</span>'}</td>
+                  <td class="${cls(p.diff)}">${p.diff !== null ? fmt(p.diff) + 's' : '—'}</td>
+                  <td>
+                    ${p.diffPct !== null ?
+                      (p.diffPct > 0.05 ? `<span class="arb-badge arb-win">Produzir! Economia de ${pct(p.diffPct)}</span>` :
+                       p.diffPct < -0.05 ? `<span class="arb-badge arb-loss">Comprar pronto</span>` :
+                       `<span class="arb-badge arb-loss">Equivalente</span>`)
+                      : '<span class="muted">Sem dados</span>'}
+                  </td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+function viewFoodPlan() {
+  const p = computeFoodPlan();
+  return `
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin:12px 0">
+      <div style="display:flex;gap:8px">
+        <button id="addFoodMealBtn" class="btn" style="font-size:12px">+ Adicionar Comida ao Plano</button>
+        <button id="clearFoodPlan" class="ghost" style="font-size:12px">🗑️ Limpar Plano</button>
+      </div>
+      <div class="muted">
+        Local de Craft: <b>${esc(foodFilter.city)}</b> (${(foodFilter.retRate * 100).toFixed(1)}% retorno) ${foodFilter.focus ? '· <b>Foco Ativo</b>' : ''}
+      </div>
+    </div>
+
+    <div class="cards">
+      <div class="stat"><div class="label">Total de Comidas</div><div class="value">${fmt(p.totalMeals)} un.</div></div>
+      <div class="stat"><div class="label">Investimento Total</div><div class="value">${fmt(p.totalInvestment)}s</div></div>
+      <div class="stat"><div class="label">Receita Bruta Estimada</div><div class="value">${fmt(p.totalRevenue)}s</div></div>
+      <div class="stat"><div class="label">Lucro Líquido Estimado</div><div class="value pos">${fmt(p.totalProfit)}s</div></div>
+      ${foodFilter.focus ? `<div class="stat"><div class="label">Foco Necessário</div><div class="value">${fmt(p.totalFocus)}</div></div>` : ''}
+    </div>
+
+    <div class="card" style="margin-top:12px">
+      <h3>Receitas Selecionadas</h3>
+      <div class="tablewrap">
+        <table>
+          <thead>
+            <tr>
+              <th class="l">Comida</th>
+              <th>Lotes (10 un./lote)</th>
+              <th>Total Produzido</th>
+              <th>Custo Unit.</th>
+              <th>Custo Total</th>
+              <th>Melhor Venda</th>
+              <th>Lucro Unit.</th>
+              <th>Lucro Total</th>
+              <th>Ação</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${p.rows.map(r => {
+              const it = r.it;
+              if (!it) return '';
+              const allFoodOpts = (GD.foods || []).flatMap(f => [
+                opt(f.id, `${f.name} (T${f.tier})`, it.id),
+                ...(f.enchantments || []).map(e => opt(e.id, `${f.name} .${e.level} (T${f.tier}.${e.level})`, it.id))
+              ]).join('');
+              return `
+                <tr>
+                  <td class="l" style="display:flex;align-items:center;gap:8px">
+                    <img src="${itemIconUrl(it.id)}" class="food-icon" alt="">
+                    <div>
+                      <select data-foodplanselect="${r.idx}" style="font-weight:600">
+                        ${allFoodOpts}
+                      </select>
+                      <div class="muted">${esc(it.familyLabel)} · ${esc(it.nameEn)}</div>
+                    </div>
+                  </td>
+                  <td>
+                    <input class="num" type="number" min="1" max="10000" style="width:75px" value="${r.batches}" data-foodplan="${r.idx}">
+                  </td>
+                  <td><b>${fmt(r.totalUnits)}</b> un.</td>
+                  <td>${fmt(it.unitCost)}s</td>
+                  <td>${fmt(r.totalCost)}s</td>
+                  <td>${it.spotPrice ? `<b>${fmt(it.spotPrice)}</b>s <span class="muted">(${locName(it.sellLoc)})</span>` : '—'}</td>
+                  <td class="${cls(it.profit)}">${fmt(it.profit)}s</td>
+                  <td class="${cls(r.totalProfit)}"><b>${fmt(r.totalProfit)}</b>s</td>
+                  <td>
+                    <button class="icon" data-delfood="${r.idx}" title="Remover do plano">✕</button>
+                  </td>
+                </tr>
+              `;
+            }).join('')}
+            ${!p.rows.length ? '<tr><td colspan="9" class="empty">Nenhuma comida adicionada ao plano. Use o botão acima ou adicione pelo Ranking de Comidas.</td></tr>' : ''}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    ${p.shoppingList.length ? `
+      <div class="card" style="margin-top:16px">
+        <h3>🛒 Lista de Compras Consolidada de Culinária</h3>
+        <div class="muted" style="margin-bottom:12px">
+          Quantidades líquidas já consideram a taxa de retorno de recursos da cidade (${(foodFilter.retRate * 100).toFixed(1)}%). Molhos de peixe têm 0% de retorno conforme regra oficial do jogo.
+        </div>
+        <div class="tablewrap">
+          <table>
+            <thead>
+              <tr>
+                <th class="l">Ingrediente</th>
+                <th>Qtd Bruta</th>
+                <th>Qtd Líquida (Comprar)</th>
+                <th>Método de Obtenção</th>
+                <th>Onde Comprar</th>
+                <th>Preço Unitário</th>
+                <th>Custo Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${p.shoppingList.map(item => {
+                const buy = item.buy;
+                const isArb = buy && buy.isArbitrage;
+                const methodTag = isArb ? `<span class="tag step">${esc(buy.methodLabel)}</span>` : `<span class="tag comprar">Mercado</span>`;
+                return `
+                  <tr>
+                    <td class="l" style="display:flex;align-items:center;gap:6px">
+                      <img src="${item.icon}" style="width:24px;height:24px;vertical-align:middle">
+                      <b>${esc(item.name)}</b>
+                    </td>
+                    <td>${fmt(Math.ceil(item.grossQty))} un.</td>
+                    <td><b class="pos">${fmt(Math.ceil(item.netQty))}</b> un.</td>
+                    <td>${methodTag}</td>
+                    <td>${buy ? `<b>${locName(buy.loc)}</b>` : '<span class="muted">—</span>'}</td>
+                    <td>${item.costPerUnit ? fmt(item.costPerUnit, 1) + 's' : '—'}</td>
+                    <td><b>${fmt(item.totalCost)}</b>s</td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    ` : ''}
+  `;
+}
+
+function viewFoodPrices() {
+  const sub = foodFilter.priceSubtab || 'meals';
+  const subtabs = [
+    ['meals', '🍲 Comidas Meta (.0 a .3)'],
+    ['ingredients', '🌾 Cultivos & Insumos'],
+    ['animals', '🐄 Animais (Açougue)'],
+    ['processing', '🥖 Farinhas, Pães & Molhos']
+  ];
+
+  let itemsToShow = [];
+  if (sub === 'meals') {
+    for (const f of GD.foods || []) {
+      itemsToShow.push({ id: f.id, label: `${f.name} (T${f.tier})` });
+      for (const e of f.enchantments || []) {
+        itemsToShow.push({ id: e.id, label: `${f.name} .${e.level} (T${f.tier}.${e.level})` });
+      }
+    }
+  } else if (sub === 'ingredients') {
+    const rawIds = ['T1_CARROT', 'T2_BEAN', 'T3_WHEAT', 'T4_TURNIP', 'T5_CABBAGE', 'T6_POTATO', 'T7_CORN', 'T8_PUMPKIN', 'T3_EGG', 'T5_EGG', 'T4_MILK', 'T6_MILK', 'T8_MILK', 'T3_MEAT', 'T4_MEAT', 'T5_MEAT', 'T6_MEAT', 'T7_MEAT', 'T8_MEAT'];
+    itemsToShow = rawIds.map(id => ({ id, label: (GD.itemNames && GD.itemNames[id]) || id }));
+  } else if (sub === 'animals') {
+    const animIds = (GD.butchering || []).map(b => b.animalId);
+    itemsToShow = animIds.map(id => ({ id, label: (GD.itemNames && GD.itemNames[id]) || id }));
+  } else if (sub === 'processing') {
+    const procIds = ['T3_FLOUR', 'T4_BREAD', 'T4_BUTTER', 'T6_BUTTER', 'T8_BUTTER', 'T1_FISHSAUCE_LEVEL1', 'T1_FISHSAUCE_LEVEL2', 'T1_FISHSAUCE_LEVEL3'];
+    itemsToShow = procIds.map(id => ({ id, label: (GD.itemNames && GD.itemNames[id]) || id }));
+  }
+
+  return `
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin:12px 0">
+      <div class="subtabs" style="margin:0">
+        ${subtabs.map(([id, label]) => `<button class="${sub === id ? 'active' : ''}" data-foodpricesub="${id}">${label}</button>`).join('')}
+      </div>
+      <div style="display:flex;gap:8px">
+        <button id="fetchFoodPrices" class="btn" style="font-size:12px;padding:6px 12px">🔄 Buscar Cotações de Comida</button>
+        <button id="fetchFoodVolumes" class="ghost" style="font-size:12px;padding:6px 12px">📊 Buscar Histórico & VWAP</button>
+      </div>
+    </div>
+    ${priceTable(itemsToShow, GD.saleLocs)}
+  `;
+}
+
 function viewPrices() {
   const tabs = [
     ['ore', '⛏️ Minério'],
@@ -1593,6 +2472,42 @@ function planIds() {
   }
   return [...ids];
 }
+function foodIds() {
+  const ids = new Set();
+  if (GD.foods) {
+    for (const f of GD.foods) {
+      ids.add(f.id);
+      for (const e of f.enchantments || []) {
+        ids.add(e.id);
+        if (e.sauceId) ids.add(e.sauceId);
+      }
+      for (const ing of f.ingredients || []) ids.add(ing.id);
+    }
+  }
+  if (GD.butchering) {
+    for (const b of GD.butchering) {
+      ids.add(b.animalId);
+      ids.add(b.meatId);
+    }
+  }
+  if (GD.foodProcessing) {
+    for (const p of GD.foodProcessing) {
+      ids.add(p.id);
+      ids.add(p.fromId);
+    }
+  }
+  return [...ids];
+}
+function foodMealIds() {
+  const ids = new Set();
+  if (GD.foods) {
+    for (const f of GD.foods) {
+      ids.add(f.id);
+      for (const e of f.enchantments || []) ids.add(e.id);
+    }
+  }
+  return [...ids];
+}
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 let FETCHING = false;
 function chunkIds(ids, maxLen = 3500) {          // lotes limitados pelo tamanho da URL => menos requisições
@@ -1634,9 +2549,10 @@ async function fetchPrices(ids) {
       const data = await fetchChunk(ch, locs, progress);
       for (const e of data) {
         const isGear = !(/^(T\d+_(ORE|METALBAR|WOOD|PLANKS)|.*ARTEFACT.*|.*TOKEN_ROYAL.*)$/.test(e.item_id));
+        const isFoodRelated = (e.item_id.includes('_MEAL_') || e.item_id.includes('_MEAT') || e.item_id.includes('_FARM_') || e.item_id.includes('FISHSAUCE') || e.item_id.includes('FLOUR') || e.item_id.includes('BREAD') || e.item_id.includes('BUTTER') || /^(T\d+_(CARROT|BEAN|WHEAT|TURNIP|CABBAGE|POTATO|CORN|PUMPKIN|EGG|MILK))/.test(e.item_id));
         const loc = e.city;
         if (!GD.saleLocs.includes(loc)) continue;
-        if (!isGear && !GD.cities.includes(loc)) continue;
+        if (!isGear && !isFoodRelated && !GD.cities.includes(loc)) continue;
         let price = e.sell_price_min, date = e.sell_price_min_date;
         if (loc === 'Black Market') { price = e.buy_price_max; date = e.buy_price_max_date; }
         const q = String(e.quality || 1);
@@ -2129,6 +3045,40 @@ function bind() {
       }
       return render();
     }
+    if (d.ff) {
+      if (d.ff === 'city') {
+        foodFilter.city = el.value;
+        updateFoodReturnRate();
+      } else if (d.ff === 'focus') {
+        foodFilter.focus = el.checked;
+        updateFoodReturnRate();
+      } else if (d.ff === 'retRate') {
+        foodFilter.retRate = Number(el.value) / 100;
+      } else if (d.ff === 'feeFood') {
+        foodFilter.feeFood = Number(el.value) || 0;
+      } else {
+        foodFilter[d.ff] = el.type === 'checkbox' ? el.checked : el.value;
+      }
+      return render();
+    }
+    if (d.foodplan !== undefined) {
+      ST.foodPlan = ST.foodPlan || [];
+      const row = ST.foodPlan[Number(d.foodplan)];
+      if (row) {
+        row.batches = Math.max(1, Number(el.value) || 1);
+        changed();
+      }
+      return;
+    }
+    if (d.foodplanselect !== undefined) {
+      ST.foodPlan = ST.foodPlan || [];
+      const row = ST.foodPlan[Number(d.foodplanselect)];
+      if (row) {
+        row.id = el.value;
+        changed();
+      }
+      return;
+    }
     if (el.id === 'importFile' && el.files[0]) {
       el.files[0].text().then(t => { ST = JSON.parse(t); changed(); toast('Backup importado.'); }).catch(() => toast('Arquivo inválido.'));
     }
@@ -2142,6 +3092,35 @@ function bind() {
     if (t.dataset.addrank) { const [code, slot, k] = t.dataset.addrank.split('|'); ST.plan.push({ code, slot, k, qty: 10 }); save(); return toast('Adicionado ao planejador (10 un.).'); }
     if (t.dataset.ptab) { priceTab = t.dataset.ptab; return render(); }
     if (t.dataset.rtab) { refineTab = t.dataset.rtab; return render(); }
+    if (t.dataset.foodtab) { foodTab = t.dataset.foodtab; return render(); }
+    if (t.dataset.foodpricesub) { foodFilter.priceSubtab = t.dataset.foodpricesub; return render(); }
+    if (t.dataset.addfood) {
+      ST.foodPlan = ST.foodPlan || [];
+      ST.foodPlan.push({ id: t.dataset.addfood, batches: 1 });
+      save();
+      return toast('Adicionado ao Planejador de Culinária (1 lote = 10 comidas).');
+    }
+    if (t.id === 'addFoodMealBtn') {
+      ST.foodPlan = ST.foodPlan || [];
+      const defaultId = (GD.foods && GD.foods[0] ? GD.foods[0].id : 'T3_MEAL_PIE');
+      ST.foodPlan.push({ id: defaultId, batches: 1 });
+      changed();
+      return toast('Comida adicionada ao plano de culinária.');
+    }
+    if (t.dataset.delfood !== undefined) {
+      ST.foodPlan = ST.foodPlan || [];
+      ST.foodPlan.splice(Number(t.dataset.delfood), 1);
+      return changed();
+    }
+    if (t.id === 'clearFoodPlan') {
+      if (confirm('Limpar todo o plano de culinária?')) {
+        ST.foodPlan = [];
+        changed();
+      }
+      return;
+    }
+    if (t.id === 'fetchFoodPrices') return fetchPrices(foodIds());
+    if (t.id === 'fetchFoodVolumes') return fetchVolumes(foodMealIds());
     if (t.id === 'fetchAll') return fetchPrices(allIds());
     if (t.id === 'fetchTab') return fetchPrices(tabIds());
     if (t.id === 'fetchPlan') return fetchPrices(planIds());
@@ -2254,6 +3233,20 @@ async function checkLiveStatus() {
   [GD, ST] = await Promise.all([fetch('/api/gamedata').then(r => r.json()), fetch('/api/state').then(r => r.json())]);
   ST.prices ??= {}; ST.dates ??= {}; ST.origins ??= {}; ST.plankOrigins ??= {}; ST.plan ??= []; ST.volumes ??= {};
   ST.qualityPrices ??= {}; ST.qualityDates ??= {}; ST.qualityAmounts ??= {}; ST.amounts ??= {};
+  ST.foodPlan ??= [];
+  ST.foodConfig = {
+    city: 'Caerleon',
+    focus: false,
+    retRate: 0.248,
+    feeFood: 465,
+    autoArbitrage: true,
+    ...ST.foodConfig
+  };
+  foodFilter.city = ST.foodConfig.city || 'Caerleon';
+  foodFilter.focus = !!ST.foodConfig.focus;
+  foodFilter.retRate = ST.foodConfig.retRate !== undefined ? ST.foodConfig.retRate : 0.248;
+  foodFilter.feeFood = ST.foodConfig.feeFood || 465;
+  foodFilter.autoArbitrage = ST.foodConfig.autoArbitrage !== false;
   ST.config = {
     taxBuy: 0, taxSell: 0.065, retRefine: 0.367, retCraft: 0.248, feeRefine: 465, feeCraft: 465,
     server: 'west', materialPricing: 'smart', targetQuality: 'mix',

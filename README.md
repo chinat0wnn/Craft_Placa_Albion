@@ -1,6 +1,6 @@
-# ⚒️ Albion Craft & Refino (Placas, Arcos & Bestas)
+# ⚒️ Albion Craft & Refino (Placas, Arcos, Bestas & Culinária)
 
-Sistema integrado de **Refino de Minérios e Madeiras** e **Craft de Equipamentos de Placas, Arcos e Bestas** para o jogo **Albion Online**, com cálculo de custo unitário real (cadeia integrada), planejador de lotes, ranking de lucratividade, análise de qualidade (Q1–Q5), proteção anti-slippage (VWAP) e leitura automática de mercado em tempo real.
+Sistema integrado de **Refino de Minérios e Madeiras**, **Craft de Equipamentos (Placas, Arcos e Bestas)** e **Culinária (Comidas Meta .0 a .3 & Açougue)** para o jogo **Albion Online**, com cálculo de custo unitário real (cadeia integrada), planejador de lotes, ranking de lucratividade, análise de qualidade (Q1–Q5), proteção anti-slippage (VWAP) e leitura automática de mercado em tempo real.
 
 ---
 
@@ -89,11 +89,36 @@ Sistema integrado de **Refino de Minérios e Madeiras** e **Craft de Equipamento
    - Envio em lotes otimizados com pausa automática (*throttle*) e tratamento com retentativa inteligente para evitar erros de limite de requisições (`HTTP 429`).
    - Indicação visual de preços desatualizados (> 48h) e suporte a edição manual de qualquer valor.
 
-10. **Planejador & Lista de Compras Consolidada:**
+10. **🍲 Culinária & Craft de Comidas (84 combinações Meta .0 a .3):**
+    - Suporte completo às 7 famílias principais de comida do Albion Online:
+      - **🥧 Tortas (Pies):** T3 Galinha, T5 Ganso e T7 Porco.
+      - **🍳 Omeletes (Omelettes):** T3 Galinha, T5 Ganso e T7 Porco.
+      - **🍲 Guisados / Ensopados (Stews):** T4 Cabra, T6 Carneiro e T8 Carne Bovina.
+      - **🥪 Sanduíches (Sandwiches):** T4 Cabra, T6 Carneiro e T8 Carne Bovina.
+      - **🍗 Assados (Roasts):** T3 Frango, T5 Ganso e T7 Porco.
+      - **🥗 Saladas (Salads):** T2 Feijão, T4 Nabo e T6 Batata.
+      - **🥣 Sopas (Soups):** T1 Cenoura, T3 Trigo e T5 Repolho.
+    - **Rendimento Real de 10 Unidades por Lote:** Cada ciclo de produção gera 10 comidas consumindo os ingredientes da receita. Custo unitário dividido por 10.
+    - **Bônus de Produção de Culinária:**
+      - **Caerleon (Cidade Bônus Oficial):** 24.8% de retorno sem foco, ~47.9% com foco.
+      - **Ilha Particular:** 0% de retorno sem foco, ~43.5% com foco.
+      - Cidades Reais: 15.2% de retorno sem foco.
+    - **Encantamentos (.1, .2, .3) com Molhos de Peixe:**
+      - Aplicação de **Molho de Peixe Básico (.1)**, **Extravagante (.2)** e **Especial (.3)** com as quantidades exatas por tier (10, 30 ou 90 molhos por lote de 10).
+      - Conforme as regras oficiais do jogo, molhos de peixe têm **0% de taxa de retorno** (sem desperdício de cálculo).
+    - **🔪 Açougue & Arbitragem de Insumos:**
+      - Compara automaticamente a economia entre **abater o animal vivo na fazenda** (1 animal adulto = 18 carnes cruas) vs **comprar a carne pronta no mercado**.
+      - Processamento intermediário: Moinho (Trigo $\rightarrow$ Farinha 1:1), Padaria (Farinha $\rightarrow$ Pão 1:1) e Cozinha (Leite $\rightarrow$ Manteiga 1:1).
+    - **📋 Planejador de Culinária & Lista de Compras Consolidada:**
+      - Planejamento de lotes com cálculo de custo, receita esperada, lucro líquido, demanda e foco necessário.
+      - Lista de compras consolidada com dedução automática do retorno de recursos da cidade.
+    - **Cotações e Busca Rápida na API:** Botão exclusivo para atualizar instantaneamente preços e histórico de liquidez/VWAP de todas as comidas e insumos.
+
+11. **Planejador & Lista de Compras Consolidada:**
     - Permite misturar Placas, Arcos e Bestas no mesmo plano de produção e informa o custo total, receita esperada, lucro líquido e giro do lote.
     - Gera uma **Lista de Compras Consolidada** separando **Minérios**, **Barras Prontas**, **Madeiras**, **Tábuas Prontas**, **Artefatos**, **Emblemas Reais** e **Peças Base** (já descontando os retornos de recursos esperados), indicando em qual cidade comprar cada item pelo menor preço.
 
-11. **Versão Planilha Excel:**
+12. **Versão Planilha Excel:**
     - Acompanha o arquivo `Planilha_Craft_Placas.xlsx` com fórmulas matemáticas idênticas e validadas diretamente no Excel.
 
 ---
