@@ -109,6 +109,31 @@ Sistema integrado de **Refino de Minérios e Madeiras**, **Craft de Equipamentos
     - **🔪 Açougue & Arbitragem de Insumos:**
       - Compara automaticamente a economia entre **abater o animal vivo na fazenda** (1 animal adulto = 18 carnes cruas) vs **comprar a carne pronta no mercado**.
       - Processamento intermediário: Moinho (Trigo $\rightarrow$ Farinha 1:1), Padaria (Farinha $\rightarrow$ Pão 1:1) e Cozinha (Leite $\rightarrow$ Manteiga 1:1).
+    - **🏛️ Nutrição de Estações de Craft & Comidas Favoritas (2x Nutrição):**
+      - Mapeamento oficial das **16 estações de craft, refino e processamento** extraídas dos binários do jogo (`buildings.json`).
+      - Cada estação consome nutrição por ciclo de fabricação; donos de lotes urbanos compram massivamente a **Comida Favorita** de cada loja porque ela concede **+100% de nutrição bônus (o dobro / 2x)** por prata gasta:
+        - 🔨 **Forja do Guerreiro (`FORGE`):** Guisado de Carneiro T6 (`T6_MEAL_STEW`) $\rightarrow$ 886 nutrição (2x).
+        - 🏹 **Cabana do Caçador (`HUNTERSLODGE`):** Salada de Batata T6 (`T6_MEAL_SALAD`) $\rightarrow$ 886 nutrição (2x).
+        - 🔮 **Torre do Mago (`MAGICITEMS`):** Sanduíche de Carneiro T6 (`T6_MEAL_SANDWICH`) $\rightarrow$ 886 nutrição (2x).
+        - ⛏️ **Fundição de Minério (`SMELTER`):** Sopa de Trigo T3 (`T3_MEAL_SOUP`) $\rightarrow$ 266 nutrição (2x).
+        - 🪵 **Serraria (`CARPENTERSWORKSHOP`):** Sopa de Cenoura T1 (`T1_MEAL_SOUP`) $\rightarrow$ 88 nutrição (2x).
+        - 🐂 **Curtume (`TANNERY`):** Torta de Galinha T3 (`T3_MEAL_PIE`) $\rightarrow$ 156 nutrição (2x).
+        - 🧵 **Tecelagem (`WEAVINGMILL`):** Omelete de Galinha T3 (`T3_MEAL_OMELETTE`) $\rightarrow$ 156 nutrição (2x).
+        - 🪨 **Cantaria (`STONEMASONRY`):** Salada de Feijão T2 (`T2_MEAL_SALAD`) $\rightarrow$ 88 nutrição (2x).
+        - 🍲 **Cozinha (`COOK`):** Torta de Ganso T5 (`T5_MEAL_PIE`) $\rightarrow$ 532 nutrição (2x).
+        - 🧪 **Laboratório de Alquimia (`ALCHEMIST`):** Omelete de Porco T7 (`T7_MEAL_OMELETTE`) $\rightarrow$ 1.598 nutrição (2x).
+        - 🔪 **Açougueiro (`BUTCHER`):** Sopa de Repolho T5 (`T5_MEAL_SOUP`) $\rightarrow$ 800 nutrição (2x).
+        - 🌾 **Moinho (`MILL`):** Omelete de Ganso T5 (`T5_MEAL_OMELETTE`) $\rightarrow$ 532 nutrição (2x).
+        - ⚙️ **Fabricante de Ferramentas (`TOOLMAKER`):** Salada de Nabo T4 (`T4_MEAL_SALAD`) $\rightarrow$ 266 nutrição (2x).
+        - 🐎 **Cavalariça / Selaria (`STABLE`):** Guisado de Cabra T4 (`T4_MEAL_STEW`) $\rightarrow$ 266 nutrição (2x).
+        - ✨ **Forja de Artefatos (`MELDBUILDING`):** Salada de Batata T6 (`T6_MEAL_SALAD`) $\rightarrow$ 886 nutrição (2x).
+        - 🔧 **Oficina de Reparos (`REPAIRSHOP`):** Sanduíche de Cabra T4 (`T4_MEAL_SANDWICH`) $\rightarrow$ 266 nutrição (2x).
+    - **🔥 Registro & Seletor de Bônus Diários de Produção:**
+      - Seletor persistente no topo da tela e na aba de Culinária com os **13 eventos diários do Albion Online**.
+      - Identificação automática do **Pico de Demanda do Dia**: indica na hora qual comida terá consumo explosivo devido ao evento ativo.
+      - **Destaque Dinâmico no Ranking:** As comidas do dia recebem aura dourada pulsante (`bonus-glow`) e o selo `🔥 BÔNUS HOJE`.
+      - **Filtro de Construções:** Filtra o ranking apenas por comidas usadas em lojas ou por estação específica.
+      - **Envio Rápido de Lotes:** Botões de 1 lote (10 un.) e 10 lotes (100 un.) para abastecer o Planejador com um clique.
     - **📋 Planejador de Culinária & Lista de Compras Consolidada:**
       - Planejamento de lotes com cálculo de custo, receita esperada, lucro líquido, demanda e foco necessário.
       - Lista de compras consolidada com dedução automática do retorno de recursos da cidade.

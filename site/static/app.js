@@ -14,8 +14,19 @@ let foodFilter = {
   family: '', tier: '', ench: '', city: 'Caerleon', focus: false,
   retRate: 0.248, feeFood: 465, sellLoc: '', sellPricing: 'spot',
   autoArbitrage: true, onlyPriced: true, healthFilter: 'all', sort: 'profitDaily',
-  priceSubtab: 'meals'
+  priceSubtab: 'meals', stationUse: ''
 };
+
+function getActiveDailyBonus() {
+  const bonusId = (ST && ST.activeDailyBonus) ? ST.activeDailyBonus : 'none';
+  return ((GD && GD.dailyBonuses) ? GD.dailyBonuses.find(b => b.id === bonusId) : null) || (GD && GD.dailyBonuses ? GD.dailyBonuses[0] : { id: 'none', name: 'Nenhum' });
+}
+
+function getStationsFedByFood(foodId) {
+  if (!GD || !GD.stationNutrition) return [];
+  const baseId = foodId.split('@')[0];
+  return GD.stationNutrition.filter(s => s.favoriteFoodId === baseId);
+}
 
 const QUALITIES = [
   { q: 1, name: 'Normal', short: 'Q1', weight: 0.45 },
@@ -1332,7 +1343,15 @@ function save() {
 function changed() { save(); render(); }
 
 /* ---------------- render ---------------- */
+function updateHeaderDailyBonusSelect() {
+  const el = $('#headerDailyBonusSelect');
+  if (!el || !GD || !GD.dailyBonuses) return;
+  const cur = (ST && ST.activeDailyBonus) ? ST.activeDailyBonus : 'none';
+  el.innerHTML = GD.dailyBonuses.map(b => `<option value="${b.id}"${b.id === cur ? ' selected' : ''}>${esc(b.name)}</option>`).join('');
+}
+
 function render() {
+  updateHeaderDailyBonusSelect();
   const active = document.activeElement;
   const focusKey = active && active.dataset ? active.dataset.fk : null;
   const scrollers = [...document.querySelectorAll('.tablewrap')].map(e => [e.scrollTop, e.scrollLeft]);
@@ -1789,6 +1808,7 @@ function priceTable(rows, locs, extraHead = '', extra = () => '', q = 1) {
 function viewFood() {
   const tabs = [
     ['rank', '🏆 Ranking de Comidas'],
+    ['nutrition', '🏛️ Nutrição & Bônus Diários'],
     ['processing', '🔪 Açougue & Insumos'],
     ['plan', `📋 Planejador (${(ST.foodPlan || []).length})`],
     ['prices', '📈 Cotações de Culinária']
@@ -1808,6 +1828,7 @@ function viewFood() {
       ${tabs.map(([id, label]) => `<button class="${foodTab === id ? 'active' : ''}" data-foodtab="${id}">${label}</button>`).join('')}
     </div>
     ${foodTab === 'rank' ? viewFoodRank() :
+      foodTab === 'nutrition' ? viewFoodNutrition() :
       foodTab === 'processing' ? viewFoodProcessing() :
       foodTab === 'plan' ? viewFoodPlan() :
       viewFoodPrices()}
@@ -1816,12 +1837,18 @@ function viewFood() {
 
 function viewFoodRank() {
   const f = foodFilter;
+  const activeBonus = getActiveDailyBonus();
   const allMeals = [];
   
   if (GD.foods) {
     for (const food of GD.foods) {
       if (f.family && food.family !== f.family) continue;
       if (f.tier && String(food.tier) !== String(f.tier)) continue;
+      if (f.stationUse) {
+        const fed = getStationsFedByFood(food.id);
+        if (f.stationUse === 'any' && !fed.length) continue;
+        if (f.stationUse !== 'any' && !fed.some(s => s.id === f.stationUse)) continue;
+      }
 
       const enchLevels = f.ench !== '' ? [Number(f.ench)] : [0, 1, 2, 3];
       for (const e of enchLevels) {
@@ -1846,7 +1873,20 @@ function viewFoodRank() {
   const bestDaily = allMeals.length ? allMeals[0] : null;
   const bestMargin = [...allMeals].sort((a, b) => (b.margin || -1e9) - (a.margin || -1e9))[0] || null;
 
+  const bonusBanner = (activeBonus && activeBonus.id !== 'none') ? `
+    <div class="bonus-hero" style="padding:12px 16px;margin:8px 0 10px">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+        <div>
+          <div style="font-weight:700;color:var(--accent);font-size:13px">🔥 BÔNUS DIÁRIO ATIVO: ${esc(activeBonus.name)}</div>
+          <div class="muted" style="font-size:12px">${esc(activeBonus.desc)} · Comida em alta demanda: <b>${esc(activeBonus.foodName)}</b></div>
+        </div>
+        <button class="btn" style="font-size:11px;padding:4px 10px" data-foodtab="nutrition">Ver Análise de Nutrição ➜</button>
+      </div>
+    </div>
+  ` : '';
+
   return `
+    ${bonusBanner}
     <div class="card toolbar" style="margin-top:8px">
       <label>Família:
         <select data-ff="family">
@@ -1867,6 +1907,13 @@ function viewFoodRank() {
           <option value="1"${f.ench === '1' ? ' selected' : ''}>.1 (Molho Básico)</option>
           <option value="2"${f.ench === '2' ? ' selected' : ''}>.2 (Molho Extravagante)</option>
           <option value="3"${f.ench === '3' ? ' selected' : ''}>.3 (Molho Especial)</option>
+        </select>
+      </label>
+      <label>Alimenta Construção:
+        <select data-ff="stationUse">
+          <option value="">Todas as Comidas</option>
+          <option value="any"${f.stationUse === 'any' ? ' selected' : ''}>🏛️ Apenas Comidas de Lojas (2x Nutrição)</option>
+          ${(GD.stationNutrition || []).map(st => `<option value="${st.id}"${f.stationUse === st.id ? ' selected' : ''}>${st.name} (${st.favoriteFoodName})</option>`).join('')}
         </select>
       </label>
       <label>Local de Produção:
@@ -1948,18 +1995,22 @@ function viewFoodRank() {
         </thead>
         <tbody>
           ${allMeals.map(m => {
+            const fedStations = getStationsFedByFood(m.baseId);
+            const isTodayBonus = activeBonus && activeBonus.foodId === m.baseId;
+            const stationBadges = fedStations.map(st => `<span class="nutri-pill x2" title="Comida favorita de: ${st.name} (+100% / 2x Nutrição)">🏛️ ${st.name} (2x)</span>`).join(' ');
+            const bonusTag = isTodayBonus ? '<span class="tag pos" style="background:#3a2910;border-color:var(--accent);color:var(--accent);font-weight:700" title="BÔNUS DO DIA ATIVO: Demanda explosiva no servidor!">🔥 BÔNUS HOJE</span> ' : '';
             const sauceChip = m.sauce ? `<span class="food-chip"><img src="${itemIconUrl(m.sauce.id)}"> ${m.sauce.count}x (${fmt(m.sauce.totalCost)}s)</span>` : '<span class="muted">—</span>';
             const ingsChips = m.ingredients.map(ing => {
               const arbTag = ing.buy && ing.buy.isArbitrage ? ' <span class="tag step" title="Obtido via abate ou processamento">arbitrado</span>' : '';
               return `<span class="food-chip" title="${ing.name}: ${ing.count} un. brutas (${fmt(ing.effCount, 1)} líquidas c/ retorno) — ${ing.costPerUnit ? fmt(ing.costPerUnit) + 's/un' : 's/ preço'}"><img src="${itemIconUrl(ing.id)}"> ${ing.count}x${arbTag}</span>`;
             }).join(' ');
             return `
-              <tr>
+              <tr class="${isTodayBonus ? 'bonus-glow' : ''}">
                 <td class="l" style="display:flex;align-items:center;gap:8px">
                   <img src="${itemIconUrl(m.id)}" class="food-icon" alt="">
                   <div>
-                    <div style="font-weight:600">${esc(m.name)}</div>
-                    <div class="muted">${esc(m.familyLabel)} · ${esc(m.nameEn)}</div>
+                    <div style="font-weight:600">${bonusTag}${esc(m.name)}</div>
+                    <div class="muted">${esc(m.familyLabel)} · ${esc(m.nameEn)} ${stationBadges ? ' · ' + stationBadges : ''}</div>
                   </div>
                 </td>
                 <td><span class="tag ${m.family}">${m.tier}.${m.ench}</span></td>
@@ -1987,6 +2038,127 @@ function viewFoodRank() {
           ${!allMeals.length ? '<tr><td colspan="11" class="empty">Nenhuma comida encontrada com os filtros selecionados.</td></tr>' : ''}
         </tbody>
       </table>
+    </div>
+  `;
+}
+
+function viewFoodNutrition() {
+  const activeBonus = getActiveDailyBonus();
+  const stations = GD.stationNutrition || [];
+  const bonuses = GD.dailyBonuses || [];
+
+  let bonusMealItem = null;
+  if (activeBonus && activeBonus.foodId) {
+    bonusMealItem = computeMealItem(activeBonus.foodId, 0);
+  }
+
+  return `
+    <div class="bonus-hero" style="margin-top:12px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px">
+        <div style="flex:1;min-width:280px">
+          <h3><span>🔥</span> Bônus Diário de Produção (Albion Online)</h3>
+          <div class="muted" style="margin-bottom:12px">
+            Selecione o evento ativo de hoje. Quando um bônus de produção é ativado, milhares de jogadores lotam as lojas urbanas para forjar ou refinar, <b>multiplicando o consumo da Comida Favorita</b> que alimenta cada loja!
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <label style="font-weight:700;color:var(--text)">Bônus Ativo Hoje:
+              <select data-ff="dailyBonus" style="margin-left:6px;font-size:13px;font-weight:700;padding:6px 12px;background:var(--input);border:1px solid var(--accent);border-radius:8px">
+                ${bonuses.map(b => `<option value="${b.id}"${b.id === activeBonus.id ? ' selected' : ''}>${esc(b.name)}</option>`).join('')}
+              </select>
+            </label>
+          </div>
+        </div>
+
+        ${activeBonus && activeBonus.id !== 'none' && bonusMealItem ? `
+          <div style="background:var(--panel2);border:1px solid var(--accent);border-radius:10px;padding:12px 16px;min-width:320px">
+            <div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:0.5px">⭐ Comida Mais Demandada Hoje</div>
+            <div style="display:flex;align-items:center;gap:10px;margin:8px 0">
+              <img src="${itemIconUrl(bonusMealItem.id)}" class="food-icon" style="width:44px;height:44px" alt="">
+              <div>
+                <div style="font-size:16px;font-weight:700">${esc(bonusMealItem.name)}</div>
+                <div class="muted">Alimenta: <b>${esc(activeBonus.stationName)}</b> (2x Nutrição)</div>
+              </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px;margin-top:6px">
+              <div>Custo Craft: <b>${fmt(bonusMealItem.unitCost)}s</b></div>
+              <div>Venda Spot: <b>${fmt(bonusMealItem.spotPrice)}s</b></div>
+              <div class="${cls(bonusMealItem.profit)}">Lucro/un: <b>${fmt(bonusMealItem.profit)}s</b></div>
+              <div>Giro Diário: <b>${fmt(bonusMealItem.dailyVol)} un/dia</b></div>
+            </div>
+            <div style="margin-top:10px;display:flex;gap:6px">
+              <button class="btn" style="font-size:11px;padding:4px 10px;flex:1" data-addfood="${bonusMealItem.id}">+ 1 Lote (10 un.)</button>
+              <button class="ghost" style="font-size:11px;padding:4px 10px;flex:1" data-addfoodbulk="${bonusMealItem.id}|10">+ 10 Lotes (100 un.)</button>
+            </div>
+          </div>
+        ` : `
+          <div style="background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:14px 18px;max-width:340px;color:var(--muted);font-size:13px">
+            💡 Selecione o bônus no menu para identificar a comida com pico de demanda hoje e planejar sua produção.
+          </div>
+        `}
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <h3>🏛️ Guia de Nutrição das Estações de Craft (Comidas Favoritas = 2x Nutrição)</h3>
+      <div class="muted" style="margin-bottom:12px">
+        Cada estação de craft consome nutrição para cada ciclo de fabricação/refino. Donos de lojas compram massivamente a <b>Comida Favorita</b> porque ela fornece <b>o dobro de nutrição (+100%)</b> por prata gasta.
+      </div>
+      <div class="tablewrap">
+        <table>
+          <thead>
+            <tr>
+              <th class="l">Estação de Craft</th>
+              <th>Categoria</th>
+              <th class="l">Comida Favorita</th>
+              <th>Nutrição Base</th>
+              <th>Nutrição Dobrada (2x)</th>
+              <th class="l">Itens Fabricados</th>
+              <th>Custo Craft</th>
+              <th>Venda Spot</th>
+              <th>Lucro Unit.</th>
+              <th>Demanda</th>
+              <th>Ação</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${stations.map(st => {
+              const meal = computeMealItem(st.favoriteFoodId, 0);
+              const isToday = activeBonus && activeBonus.targetStation === st.id;
+              return `
+                <tr class="${isToday ? 'bonus-glow' : ''}">
+                  <td class="l" style="display:flex;align-items:center;gap:6px">
+                    <img src="${st.icon}" class="building-icon" alt="">
+                    <div>
+                      <b>${esc(st.name)}</b>
+                      ${isToday ? ' <span class="tag pos" style="font-size:10px">HOJE!</span>' : ''}
+                      <div class="muted">${esc(st.nameEn)}</div>
+                    </div>
+                  </td>
+                  <td><span class="tag">${esc(st.category)}</span></td>
+                  <td class="l">
+                    <div style="display:flex;align-items:center;gap:6px">
+                      <img src="${itemIconUrl(st.favoriteFoodId)}" style="width:24px;height:24px;border-radius:4px;vertical-align:middle">
+                      <div>
+                        <b>${esc(st.favoriteFoodName)}</b> <span class="tag ${meal ? meal.family : ''}">T${st.favoriteFoodTier}</span>
+                      </div>
+                    </div>
+                  </td>
+                  <td>${fmt(st.baseNutrition)}</td>
+                  <td><span class="nutri-pill x2">+100% (${fmt(st.bonusNutrition)})</span></td>
+                  <td class="l" style="max-width:260px;white-space:normal;font-size:12px">${esc(st.craftedItems)}</td>
+                  <td>${meal && meal.unitCost !== null ? `<b>${fmt(meal.unitCost)}</b>s` : '<span class="muted">—</span>'}</td>
+                  <td>${meal && meal.spotPrice ? `<b>${fmt(meal.spotPrice)}</b>s <span class="muted">(${locName(meal.sellLoc)})</span>` : '<span class="muted">—</span>'}</td>
+                  <td class="${meal ? cls(meal.profit) : ''}">${meal && meal.profit !== null ? fmt(meal.profit) + 's' : '—'}</td>
+                  <td>${meal ? volBadge(meal.vol, meal.sellLoc, meal.id, meal.sellLoc) : '—'}</td>
+                  <td>
+                    <button class="ghost" style="font-size:11px;padding:3px 8px" data-addfood="${st.favoriteFoodId}" title="Adicionar ao Planejador de Culinária">+ Planejador</button>
+                  </td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
     </div>
   `;
 }
@@ -3046,7 +3218,12 @@ function bind() {
       return render();
     }
     if (d.ff) {
-      if (d.ff === 'city') {
+      if (d.ff === 'dailyBonus') {
+        ST.activeDailyBonus = el.value;
+        save();
+        updateHeaderDailyBonusSelect();
+        return render();
+      } else if (d.ff === 'city') {
         foodFilter.city = el.value;
         updateFoodReturnRate();
       } else if (d.ff === 'focus') {
@@ -3099,6 +3276,14 @@ function bind() {
       ST.foodPlan.push({ id: t.dataset.addfood, batches: 1 });
       save();
       return toast('Adicionado ao Planejador de Culinária (1 lote = 10 comidas).');
+    }
+    if (t.dataset.addfoodbulk) {
+      const [foodId, countStr] = t.dataset.addfoodbulk.split('|');
+      const batches = Number(countStr) || 10;
+      ST.foodPlan = ST.foodPlan || [];
+      ST.foodPlan.push({ id: foodId, batches });
+      save();
+      return toast(`Adicionado ${batches} lotes (${batches * 10} un.) ao Planejador.`);
     }
     if (t.id === 'addFoodMealBtn') {
       ST.foodPlan = ST.foodPlan || [];
@@ -3164,6 +3349,12 @@ function bind() {
       fetchSingleItemHistory(e.target.dataset.itemId);
       return;
     }
+  });
+
+  $('#headerDailyBonusSelect')?.addEventListener('change', e => {
+    ST.activeDailyBonus = e.target.value;
+    save();
+    render();
   });
 }
 
@@ -3234,6 +3425,7 @@ async function checkLiveStatus() {
   ST.prices ??= {}; ST.dates ??= {}; ST.origins ??= {}; ST.plankOrigins ??= {}; ST.plan ??= []; ST.volumes ??= {};
   ST.qualityPrices ??= {}; ST.qualityDates ??= {}; ST.qualityAmounts ??= {}; ST.amounts ??= {};
   ST.foodPlan ??= [];
+  ST.activeDailyBonus ??= 'none';
   ST.foodConfig = {
     city: 'Caerleon',
     focus: false,
