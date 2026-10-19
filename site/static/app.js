@@ -17,9 +17,60 @@ let foodFilter = {
   priceSubtab: 'meals', stationUse: ''
 };
 
+function getDailyBonusBySlot(slotNum = 1) {
+  const key = slotNum === 2 ? 'activeDailyBonus2' : 'activeDailyBonus';
+  const bonusId = (ST && ST[key]) ? ST[key] : 'none';
+  return ((GD && GD.dailyBonuses) ? GD.dailyBonuses.find(b => b.id === bonusId) : null)
+    || (GD && GD.dailyBonuses ? GD.dailyBonuses[0] : { id: 'none', name: 'Nenhum (Sem Bônus)' });
+}
+
+function getActiveDailyBonuses() {
+  const b1 = getDailyBonusBySlot(1);
+  const b2 = getDailyBonusBySlot(2);
+  const out = [];
+  if (b1 && b1.id !== 'none') out.push({ ...b1, slotNum: 1 });
+  if (b2 && b2.id !== 'none' && (!b1 || b2.id !== b1.id)) out.push({ ...b2, slotNum: 2 });
+  return out;
+}
+
 function getActiveDailyBonus() {
-  const bonusId = (ST && ST.activeDailyBonus) ? ST.activeDailyBonus : 'none';
-  return ((GD && GD.dailyBonuses) ? GD.dailyBonuses.find(b => b.id === bonusId) : null) || (GD && GD.dailyBonuses ? GD.dailyBonuses[0] : { id: 'none', name: 'Nenhum' });
+  return getDailyBonusBySlot(1);
+}
+
+function dailyBonusOptionsHtml(selectedId = 'none', placeholder = 'Nenhum (Sem Bônus)') {
+  if (!GD || !GD.dailyBonuses) return `<option value="none">${esc(placeholder)}</option>`;
+  const groups = [];
+  const groupMap = {};
+  let noneOpt = '';
+  for (const b of GD.dailyBonuses) {
+    if (b.id === 'none') {
+      noneOpt = `<option value="none"${selectedId === 'none' || !selectedId ? ' selected' : ''}>${esc(placeholder)}</option>`;
+      continue;
+    }
+    const g = b.group || 'Outros';
+    if (!groupMap[g]) {
+      groupMap[g] = [];
+      groups.push(g);
+    }
+    groupMap[g].push(b);
+  }
+  return noneOpt + groups.map(g =>
+    `<optgroup label="${esc(g)}">${groupMap[g].map(b =>
+      `<option value="${esc(b.id)}"${b.id === selectedId ? ' selected' : ''}>${esc(b.name)}${b.foodName ? ' · 🍽️ ' + esc(b.foodName) + ' (2x)' : ''}</option>`
+    ).join('')}</optgroup>`
+  ).join('');
+}
+
+function getItemDailyBonus(v, p) {
+  const active = getActiveDailyBonuses();
+  if (!active.length || !v || !p) return null;
+  const cat = v.cat || 'plate';
+  for (const b of active) {
+    if (b.craftCat === cat) {
+      if (!b.craftSlot || b.craftSlot === p.slot) return b;
+    }
+  }
+  return null;
 }
 
 function getStationsFedByFood(foodId) {
@@ -1344,10 +1395,13 @@ function changed() { save(); render(); }
 
 /* ---------------- render ---------------- */
 function updateHeaderDailyBonusSelect() {
-  const el = $('#headerDailyBonusSelect');
-  if (!el || !GD || !GD.dailyBonuses) return;
-  const cur = (ST && ST.activeDailyBonus) ? ST.activeDailyBonus : 'none';
-  el.innerHTML = GD.dailyBonuses.map(b => `<option value="${b.id}"${b.id === cur ? ' selected' : ''}>${esc(b.name)}</option>`).join('');
+  if (!GD || !GD.dailyBonuses) return;
+  const cur1 = (ST && ST.activeDailyBonus) ? ST.activeDailyBonus : 'none';
+  const cur2 = (ST && ST.activeDailyBonus2) ? ST.activeDailyBonus2 : 'none';
+  const el1 = $('#headerDailyBonusSelect1') || $('#headerDailyBonusSelect');
+  const el2 = $('#headerDailyBonusSelect2');
+  if (el1) el1.innerHTML = dailyBonusOptionsHtml(cur1, '1º Bônus: Nenhum');
+  if (el2) el2.innerHTML = dailyBonusOptionsHtml(cur2, '2º Bônus: Nenhum');
 }
 
 function render() {
@@ -1453,10 +1507,12 @@ function viewPlan() {
     const matHtml = r.it.isRoyal
       ? (r.it.bestBase ? `<span class="badge-tip" title="${esc(matBreakdownTip(r.it))}">${fmt(r.it.barsCost)}</span>` : '<span class="neg">sem base</span>')
       : `<span class="badge-tip" title="${esc(matBreakdownTip(r.it))}">${fmt(r.it.barsCost)}</span>`;
+    const itemBonus = getItemDailyBonus(r.it.v, r.it.p);
+    const bonusBadge = itemBonus ? ` <span class="tag pos" style="background:#3a2910;border-color:var(--accent);color:var(--accent);font-weight:700" title="Bônus Diário Ativo hoje: ${esc(itemBonus.name)}">🔥 BÔNUS</span>` : '';
 
     return `
-    <tr>
-      <td class="l"><select data-plan="${i}" data-f="code">${variantOpts(r.code)}</select></td>
+    <tr class="${itemBonus ? 'bonus-glow' : ''}">
+      <td class="l"><select data-plan="${i}" data-f="code">${variantOpts(r.code)}</select>${bonusBadge}</td>
       <td class="l"><select data-plan="${i}" data-f="slot">${validPieces.map(p => opt(p.slot, p.name, r.slot)).join('')}</select></td>
       <td class="l"><select data-plan="${i}" data-f="k">${tierOpts(r.k)}</select></td>
       <td><input class="num" type="number" min="0" data-plan="${i}" data-f="qty" data-fk="plan-${i}" value="${r.qty}"></td>
@@ -1613,8 +1669,10 @@ function viewRank() {
       <span class="q-badge q-${it.sell.quality || '1'}" title="${esc(it.sell.qualityName || '')}">${it.sell.qualityLabel || 'Q1'}</span>
       <span class="badge-tip" title="${esc(formatQualityTooltip(it.sell.breakdown, it.spotPrice, it.sell.qualityLabel))}">${sellPriceDisplay}</span>
     ` : '—';
+    const itemBonus = getItemDailyBonus(it.v, it.p);
+    const bonusBadge = itemBonus ? ` <span class="tag pos" style="background:#3a2910;border-color:var(--accent);color:var(--accent);font-weight:700" title="Bônus Diário Ativo hoje: ${esc(itemBonus.name)}">🔥 BÔNUS HOJE</span>` : '';
     return `
-    <tr><td class="l">${esc(it.v.name)}</td><td class="l">${it.p.name}</td><td class="l">T${it.k}</td>
+    <tr class="${itemBonus ? 'bonus-glow' : ''}"><td class="l">${esc(it.v.name)}</td><td class="l">${it.p.name}${bonusBadge}</td><td class="l">T${it.k}</td>
     <td><span class="badge-tip" title="${esc(matBreakdownTip(it))}">${fmt(it.barsCost)}</span></td><td>${it.art ? fmt(it.artCost) : '—'}</td><td class="l muted">${it.art ? esc(it.art.name) + (it.artBuy ? ' · ' + it.artBuy.loc : '') : ''}</td>
     <td>${fmt(it.fee)}</td><td><b>${fmt(it.cost)}</b></td>
     <td class="best">${sellHtml}</td><td class="l">${it.sell ? locName(it.sell.loc) : ''}</td>
@@ -1677,7 +1735,9 @@ function viewRank() {
       ${opt('50', '≥ 50 un/dia (Altíssimo Giro)', f.minVol)}
     </select></label>
     <label style="flex-direction:row;align-items:center;gap:6px;margin-top:14px"><input type="checkbox" data-rf="onlyPriced" ${f.onlyPriced ? 'checked' : ''}> só com preço completo</label>
-    <button class="btn" id="fetchVolumesRank" style="margin-top:14px">📊 Buscar volumes diários</button>
+    <button class="btn" id="fetchPricesRank" style="margin-top:14px" ${FETCHING ? 'disabled' : ''} title="Busca preços apenas da categoria/filtro selecionado + seus materiais e artefatos">↻ Buscar preços (deste filtro)</button>
+    <button class="btn" id="fetchVolumesRank" style="margin-top:14px" ${FETCHING ? 'disabled' : ''} title="Busca volumes diários apenas dos equipamentos filtrados">📊 Buscar volumes (deste filtro)</button>
+    ${FETCHING ? '<button class="btn" id="cancelFetchBtn" style="margin-top:14px;background:#ef6b6b;color:#111">⏹ Parar busca</button>' : ''}
     <span class="muted" style="margin-top:14px">${items.length} itens</span>
   </div>
   <div class="tablewrap"><table>
@@ -1697,6 +1757,9 @@ function viewRefine() {
   const refNoun = isPlank ? 'Tábua' : 'Barra';
   const rawNoun = isPlank ? 'Madeira' : 'Minério';
   const originAttr = isPlank ? 'data-plankorigin' : 'data-origin';
+  const activeBonuses = getActiveDailyBonuses();
+  const hasBarBonus = activeBonuses.some(b => b.refineMatch === 'bar');
+  const hasPlankBonus = activeBonuses.some(b => b.refineMatch === 'plank');
 
   const decLabel = {
     buy: 'Comprar Pronta',
@@ -1755,8 +1818,8 @@ function viewRefine() {
     O sistema indica qual método gera o menor custo e abastece a Lista de Compras do Planejador de acordo com a sua escolha.
   </div>
   <div class="subtabs" style="margin-top:12px">
-    <button data-rtab="bar" class="${refineTab === 'bar' ? 'active' : ''}">⛏️ Barras de Metal (Minério → Barra)</button>
-    <button data-rtab="plank" class="${refineTab === 'plank' ? 'active' : ''}">🪵 Tábuas de Madeira (Madeira → Tábua)</button>
+    <button data-rtab="bar" class="${refineTab === 'bar' ? 'active' : ''}">⛏️ Barras de Metal (Minério → Barra)${hasBarBonus ? ' 🔥 BÔNUS HOJE' : ''}</button>
+    <button data-rtab="plank" class="${refineTab === 'plank' ? 'active' : ''}">🪵 Tábuas de Madeira (Madeira → Tábua)${hasPlankBonus ? ' 🔥 BÔNUS HOJE' : ''}</button>
   </div>
   <div class="toolbar" style="margin-top:10px;margin-bottom:14px">
     <label>Modo de Compra de Materiais<select data-cfg="materialPricing">
@@ -1837,7 +1900,7 @@ function viewFood() {
 
 function viewFoodRank() {
   const f = foodFilter;
-  const activeBonus = getActiveDailyBonus();
+  const activeBonuses = getActiveDailyBonuses();
   const allMeals = [];
   
   if (GD.foods) {
@@ -1873,12 +1936,16 @@ function viewFoodRank() {
   const bestDaily = allMeals.length ? allMeals[0] : null;
   const bestMargin = [...allMeals].sort((a, b) => (b.margin || -1e9) - (a.margin || -1e9))[0] || null;
 
-  const bonusBanner = (activeBonus && activeBonus.id !== 'none') ? `
+  const bonusBanner = activeBonuses.length ? `
     <div class="bonus-hero" style="padding:12px 16px;margin:8px 0 10px">
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
-        <div>
-          <div style="font-weight:700;color:var(--accent);font-size:13px">🔥 BÔNUS DIÁRIO ATIVO: ${esc(activeBonus.name)}</div>
-          <div class="muted" style="font-size:12px">${esc(activeBonus.desc)} · Comida em alta demanda: <b>${esc(activeBonus.foodName)}</b></div>
+        <div style="display:flex;flex-direction:column;gap:4px">
+          ${activeBonuses.map(b => `
+            <div>
+              <span style="font-weight:700;color:var(--accent);font-size:13px">🔥 BÔNUS ${b.slotNum}: ${esc(b.name)}</span>
+              <span class="muted" style="font-size:12px;margin-left:8px">→ Estação: <b>${esc(b.stationName)}</b> · Comida 2x em alta: <b>${esc(b.foodName)}</b></span>
+            </div>
+          `).join('')}
         </div>
         <button class="btn" style="font-size:11px;padding:4px 10px" data-foodtab="nutrition">Ver Análise de Nutrição ➜</button>
       </div>
@@ -1996,9 +2063,12 @@ function viewFoodRank() {
         <tbody>
           ${allMeals.map(m => {
             const fedStations = getStationsFedByFood(m.baseId);
-            const isTodayBonus = activeBonus && activeBonus.foodId === m.baseId;
+            const matchingBonuses = activeBonuses.filter(b => b.foodId === m.baseId);
+            const isTodayBonus = matchingBonuses.length > 0;
             const stationBadges = fedStations.map(st => `<span class="nutri-pill x2" title="Comida favorita de: ${st.name} (+100% / 2x Nutrição)">🏛️ ${st.name} (2x)</span>`).join(' ');
-            const bonusTag = isTodayBonus ? '<span class="tag pos" style="background:#3a2910;border-color:var(--accent);color:var(--accent);font-weight:700" title="BÔNUS DO DIA ATIVO: Demanda explosiva no servidor!">🔥 BÔNUS HOJE</span> ' : '';
+            const bonusTag = isTodayBonus
+              ? `<span class="tag pos" style="background:#3a2910;border-color:var(--accent);color:var(--accent);font-weight:700" title="BÔNUS DO DIA ATIVO (${matchingBonuses.map(b => b.shortName || b.name).join(' + ')}): Demanda explosiva nas lojas!">🔥 BÔNUS HOJE (${matchingBonuses.map(b => esc(b.shortName || b.name)).join(' + ')})</span> `
+              : '';
             const sauceChip = m.sauce ? `<span class="food-chip"><img src="${itemIconUrl(m.sauce.id)}"> ${m.sauce.count}x (${fmt(m.sauce.totalCost)}s)</span>` : '<span class="muted">—</span>';
             const ingsChips = m.ingredients.map(ing => {
               const arbTag = ing.buy && ing.buy.isArbitrage ? ' <span class="tag step" title="Obtido via abate ou processamento">arbitrado</span>' : '';
@@ -2043,58 +2113,69 @@ function viewFoodRank() {
 }
 
 function viewFoodNutrition() {
-  const activeBonus = getActiveDailyBonus();
+  const b1 = getDailyBonusBySlot(1);
+  const b2 = getDailyBonusBySlot(2);
+  const activeBonuses = getActiveDailyBonuses();
   const stations = GD.stationNutrition || [];
-  const bonuses = GD.dailyBonuses || [];
 
-  let bonusMealItem = null;
-  if (activeBonus && activeBonus.foodId) {
-    bonusMealItem = computeMealItem(activeBonus.foodId, 0);
-  }
+  const bonusCardsHtml = activeBonuses.length ? activeBonuses.map(b => {
+    const meal = b.foodId ? computeMealItem(b.foodId, 0) : null;
+    if (!meal) return '';
+    return `
+      <div style="background:var(--panel2);border:1px solid var(--accent);border-radius:10px;padding:12px 16px;min-width:295px;flex:1">
+        <div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:0.5px">⭐ ${b.slotNum}º Bônus: ${esc(b.name)}</div>
+        <div style="display:flex;align-items:center;gap:10px;margin:8px 0">
+          <img src="${itemIconUrl(meal.id)}" class="food-icon" style="width:44px;height:44px" alt="">
+          <div>
+            <div style="font-size:16px;font-weight:700">${esc(meal.name)}</div>
+            <div class="muted">Alimenta: <b>${esc(b.stationName)}</b> (2x Nutrição)</div>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px;margin-top:6px">
+          <div>Custo Craft: <b>${fmt(meal.unitCost)}s</b></div>
+          <div>Venda Spot: <b>${fmt(meal.spotPrice)}s</b></div>
+          <div class="${cls(meal.profit)}">Lucro/un: <b>${fmt(meal.profit)}s</b></div>
+          <div>Giro Diário: <b>${fmt(meal.dailyVol)} un/dia</b></div>
+        </div>
+        <div style="margin-top:10px;display:flex;gap:6px">
+          <button class="btn" style="font-size:11px;padding:4px 10px;flex:1" data-addfood="${meal.id}">+ 1 Lote (10 un.)</button>
+          <button class="ghost" style="font-size:11px;padding:4px 10px;flex:1" data-addfoodbulk="${meal.id}|10">+ 10 Lotes (100 un.)</button>
+        </div>
+      </div>
+    `;
+  }).join('') : `
+    <div style="background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:14px 18px;max-width:360px;color:var(--muted);font-size:13px">
+      💡 Selecione os 2 bônus diários ativos no Albion (ex.: Arcos, Bestas, Botas de Placa, Refino de Minério, Ferramentas...) para identificar as comidas com pico de demanda hoje e planejar sua produção.
+    </div>
+  `;
 
   return `
     <div class="bonus-hero" style="margin-top:12px">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px">
-        <div style="flex:1;min-width:280px">
-          <h3><span>🔥</span> Bônus Diário de Produção (Albion Online)</h3>
+        <div style="flex:1;min-width:300px">
+          <h3><span>🔥</span> 2 Bônus Diários de Produção (Albion Online)</h3>
           <div class="muted" style="margin-bottom:12px">
-            Selecione o evento ativo de hoje. Quando um bônus de produção é ativado, milhares de jogadores lotam as lojas urbanas para forjar ou refinar, <b>multiplicando o consumo da Comida Favorita</b> que alimenta cada loja!
+            No Albion Online, todos os dias há <b>2 bônus diários específicos por item/linha</b> (+10% ou +20% em Arcos, Bestas, Armadura de Placa, Bota de Placa, Ferramentas de Coleta, Poções, Comidas ou Refino). Quando ativos, os crafters esvaziam a nutrição da barraca correspondente, <b>disparando a procura pela Comida Favorita (2x Nutrição)</b> daquela estação!
           </div>
-          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-            <label style="font-weight:700;color:var(--text)">Bônus Ativo Hoje:
-              <select data-ff="dailyBonus" style="margin-left:6px;font-size:13px;font-weight:700;padding:6px 12px;background:var(--input);border:1px solid var(--accent);border-radius:8px">
-                ${bonuses.map(b => `<option value="${b.id}"${b.id === activeBonus.id ? ' selected' : ''}>${esc(b.name)}</option>`).join('')}
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+            <label style="font-weight:700;color:var(--text);display:flex;flex-direction:column;gap:4px">
+              <span>1º Bônus Diário Ativo:</span>
+              <select data-ff="dailyBonus1" style="font-size:13px;font-weight:700;padding:6px 12px;background:var(--input);border:1px solid var(--accent);border-radius:8px;min-width:260px">
+                ${dailyBonusOptionsHtml(b1.id, 'Nenhum (Sem 1º Bônus)')}
+              </select>
+            </label>
+            <label style="font-weight:700;color:var(--text);display:flex;flex-direction:column;gap:4px">
+              <span>2º Bônus Diário Ativo:</span>
+              <select data-ff="dailyBonus2" style="font-size:13px;font-weight:700;padding:6px 12px;background:var(--input);border:1px solid var(--accent);border-radius:8px;min-width:260px">
+                ${dailyBonusOptionsHtml(b2.id, 'Nenhum (Sem 2º Bônus)')}
               </select>
             </label>
           </div>
         </div>
 
-        ${activeBonus && activeBonus.id !== 'none' && bonusMealItem ? `
-          <div style="background:var(--panel2);border:1px solid var(--accent);border-radius:10px;padding:12px 16px;min-width:320px">
-            <div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:0.5px">⭐ Comida Mais Demandada Hoje</div>
-            <div style="display:flex;align-items:center;gap:10px;margin:8px 0">
-              <img src="${itemIconUrl(bonusMealItem.id)}" class="food-icon" style="width:44px;height:44px" alt="">
-              <div>
-                <div style="font-size:16px;font-weight:700">${esc(bonusMealItem.name)}</div>
-                <div class="muted">Alimenta: <b>${esc(activeBonus.stationName)}</b> (2x Nutrição)</div>
-              </div>
-            </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px;margin-top:6px">
-              <div>Custo Craft: <b>${fmt(bonusMealItem.unitCost)}s</b></div>
-              <div>Venda Spot: <b>${fmt(bonusMealItem.spotPrice)}s</b></div>
-              <div class="${cls(bonusMealItem.profit)}">Lucro/un: <b>${fmt(bonusMealItem.profit)}s</b></div>
-              <div>Giro Diário: <b>${fmt(bonusMealItem.dailyVol)} un/dia</b></div>
-            </div>
-            <div style="margin-top:10px;display:flex;gap:6px">
-              <button class="btn" style="font-size:11px;padding:4px 10px;flex:1" data-addfood="${bonusMealItem.id}">+ 1 Lote (10 un.)</button>
-              <button class="ghost" style="font-size:11px;padding:4px 10px;flex:1" data-addfoodbulk="${bonusMealItem.id}|10">+ 10 Lotes (100 un.)</button>
-            </div>
-          </div>
-        ` : `
-          <div style="background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:14px 18px;max-width:340px;color:var(--muted);font-size:13px">
-            💡 Selecione o bônus no menu para identificar a comida com pico de demanda hoje e planejar sua produção.
-          </div>
-        `}
+        <div style="display:flex;gap:12px;flex-wrap:wrap;flex:1.2;min-width:300px">
+          ${bonusCardsHtml}
+        </div>
       </div>
     </div>
 
@@ -2123,14 +2204,15 @@ function viewFoodNutrition() {
           <tbody>
             ${stations.map(st => {
               const meal = computeMealItem(st.favoriteFoodId, 0);
-              const isToday = activeBonus && activeBonus.targetStation === st.id;
+              const stBonuses = activeBonuses.filter(b => b.targetStation === st.id);
+              const isToday = stBonuses.length > 0;
               return `
                 <tr class="${isToday ? 'bonus-glow' : ''}">
                   <td class="l" style="display:flex;align-items:center;gap:6px">
                     <img src="${st.icon}" class="building-icon" alt="">
                     <div>
                       <b>${esc(st.name)}</b>
-                      ${isToday ? ' <span class="tag pos" style="font-size:10px">HOJE!</span>' : ''}
+                      ${isToday ? stBonuses.map(b => ` <span class="tag pos" style="font-size:10px">🔥 HOJE: ${esc(b.shortName || b.name)}</span>`).join('') : ''}
                       <div class="muted">${esc(st.nameEn)}</div>
                     </div>
                   </td>
@@ -2533,18 +2615,39 @@ function viewPrices() {
     ${priceTable(rows, GD.saleLocs, '<th>Demanda / dia</th><th>Saúde / Histórico</th>', r => `<td>${volBadge(getBestVol(r.id), '', r.id)}</td><td>${priceHealthBadge(bestSellForQuality(r.id, curQ)?.price, getBestVol(r.id), r.id)}</td>`, curQ)}`;
   }
   const last = ST.lastFetch ? new Date(ST.lastFetch).toLocaleString('pt-BR') : 'nunca';
+  const cov = getCoverageStats();
+  const freshnessMode = ST.config.fetchFreshness || 'smart_60';
   return `
   <h2>Preços</h2>
   <div class="card">
-    <b>Buscar preços e volumes de mercado</b> <span class="muted">· Albion Data Project (dados enviados por jogadores; consulte preços por qualidade e preços médios de volume)</span>
-    <div class="toolbar">
-      <label>Servidor<select data-cfg="server">${opt('west', 'Américas (West)', ST.config.server)}${opt('east', 'Ásia (East)', ST.config.server)}${opt('europe', 'Europa', ST.config.server)}</select></label>
-      <button class="btn" id="fetchAll" style="margin-top:14px">↻ Buscar todos os preços (Q1-Q5)</button>
-      <button class="ghost" id="fetchTab" style="margin-top:14px">↻ Buscar preços desta aba</button>
-      <button class="btn" id="fetchGearVolumesAll" style="margin-top:14px">📊 Buscar todos os volumes</button>
-      <span class="muted" style="margin-top:14px">Última busca: ${last}</span>
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+      <div><b>Buscar preços e volumes de mercado</b> <span class="muted">· Albion Data Project (coleta inteligente em lotes otimizados com retomada automática)</span></div>
+      <div class="muted" style="font-size:12px">
+        📊 Cobertura atual — <b>Preços:</b> ${cov.priced}/${cov.total} (${cov.pricePct}%) · <b>Volumes:</b> ${cov.volumed}/${cov.gearTotal} (${cov.volPct}%) · Última busca: ${last}
+      </div>
     </div>
-    <div class="muted">Compra = menor oferta de venda (sell min) nas cidades. Venda = menor oferta de venda nas cidades/Caerleon; no Mercado Negro = maior ordem de compra (buy max). Preços e volumes suportam qualidades Q1 a Q5.</div>
+    <div class="toolbar" style="margin-top:8px">
+      <label>Servidor<select data-cfg="server">${opt('west', 'Américas (West)', ST.config.server)}${opt('east', 'Ásia (East)', ST.config.server)}${opt('europe', 'Europa', ST.config.server)}</select></label>
+      <label title="Evita gastar limite da API reconsultando itens que já foram atualizados há poucos minutos">Modo Coleta API<select data-cfg="fetchFreshness">
+        ${opt('smart_60', '⚡ Inteligente: Faltantes ou > 1h (Recomendado)', freshnessMode)}
+        ${opt('smart_15', '⚡ Rápido: Faltantes ou > 15 min', freshnessMode)}
+        ${opt('smart_360', '🛡️ Econômico: Faltantes ou > 6h', freshnessMode)}
+        ${opt('missing_only', '🎯 Só Faltantes (Apenas itens sem dados)', freshnessMode)}
+        ${opt('force_all', '🔄 Forçar Tudo (Reconsultar do zero)', freshnessMode)}
+      </select></label>
+      <button class="btn" id="fetchAll" style="margin-top:14px" ${FETCHING ? 'disabled' : ''}>↻ Buscar todos os preços</button>
+      <button class="ghost" id="fetchTab" style="margin-top:14px" ${FETCHING ? 'disabled' : ''}>↻ Buscar preços desta aba</button>
+      <button class="btn" id="fetchGearVolumesAll" style="margin-top:14px" ${FETCHING ? 'disabled' : ''}>📊 Buscar todos os volumes</button>
+      ${FETCHING ? '<button class="btn" id="cancelFetchBtn" style="margin-top:14px;background:#ef6b6b;color:#111">⏹ Parar busca</button>' : ''}
+    </div>
+    <div class="toolbar" style="margin-top:6px;padding-top:8px;border-top:1px solid #232836;gap:6px">
+      <span class="muted" style="font-size:12px;margin-right:4px">⚡ Coleta rápida por categoria (economiza API):</span>
+      <button class="ghost" id="fetchBaseMaterialsPrices" style="font-size:12px;padding:4px 10px" ${FETCHING ? 'disabled' : ''}>📦 Só Materiais & Artefatos (${cov.matPriced}/${cov.matTotal})</button>
+      <button class="ghost" id="fetchCatPlate" style="font-size:12px;padding:4px 10px" ${FETCHING ? 'disabled' : ''}>🛡️ Só Placas (${cov.platePriced}/${cov.plateTotal})</button>
+      <button class="ghost" id="fetchCatBow" style="font-size:12px;padding:4px 10px" ${FETCHING ? 'disabled' : ''}>🏹 Só Arcos (${cov.bowPriced}/${cov.bowTotal})</button>
+      <button class="ghost" id="fetchCatCrossbow" style="font-size:12px;padding:4px 10px" ${FETCHING ? 'disabled' : ''}>🎯 Só Bestas (${cov.xbowPriced}/${cov.xbowTotal})</button>
+    </div>
+    <div class="muted" style="margin-top:6px">💡 <b>Por que a coleta inteligente não trava na API?</b> Materiais, artefatos e comidas são consultados apenas em Q1 (5× mais leve), equipamentos são divididos em lotes menores anti-timeout, e itens já consultados recentemente são pulados automaticamente para que cliques seguidos completem 100% da base sem repetir trabalho.</div>
   </div>
   <div class="subtabs">${tabs.map(([k, l]) => `<button data-ptab="${k}" class="${priceTab === k ? 'active' : ''}">${l}</button>`).join('')}</div>
   ${content}`;
@@ -2595,12 +2698,41 @@ function viewConfig() {
     <label class="ghost" style="flex-direction:row;cursor:pointer;color:var(--text)">⬆ Importar backup<input type="file" id="importFile" accept=".json" hidden></label></div>`;
 }
 
-/* ---------------- API de preços ---------------- */
-function allIds() {
+/* ---------------- API de preços e volumes (Inteligente & Anti-Rate-Limit) ---------------- */
+function baseMaterialAndArtIds() {
   const ids = new Set();
   BAR_KEYS.forEach(k => { ids.add(oreId(k)); ids.add(barId(k)); ids.add(woodId(k)); ids.add(plankId(k)); });
   Object.values(GD.artifacts).forEach(a => ids.add(a.id));
   if (GD.royal) Object.values(GD.royal.sigils).forEach(s => ids.add(s.id));
+  return [...ids];
+}
+function categoryCraftIds(cat) {
+  const ids = new Set();
+  const needBars = (cat === 'plate' || cat === 'crossbow');
+  const needPlanks = (cat === 'bow' || cat === 'crossbow');
+  BAR_KEYS.forEach(k => {
+    if (needBars) { ids.add(oreId(k)); ids.add(barId(k)); }
+    if (needPlanks) { ids.add(woodId(k)); ids.add(plankId(k)); }
+  });
+  if (cat === 'plate' && GD.royal) {
+    Object.values(GD.royal.sigils).forEach(s => ids.add(s.id));
+  }
+  for (const v of GD.variants) {
+    if ((v.cat || 'plate') !== cat) continue;
+    for (const p of piecesOf(v)) {
+      for (let t = 4; t <= 8; t++) {
+        if (v.artifact) {
+          const a = artOf(v.code, p.slot, t);
+          if (a) ids.add(a.id);
+        }
+      }
+      for (const k of TIERS) ids.add(itemId(v.code, p.slot, k));
+    }
+  }
+  return [...ids];
+}
+function allIds() {
+  const ids = new Set(baseMaterialAndArtIds());
   for (const v of GD.variants) for (const p of piecesOf(v)) for (const k of TIERS) ids.add(itemId(v.code, p.slot, k));
   return [...ids];
 }
@@ -2644,6 +2776,42 @@ function planIds() {
   }
   return [...ids];
 }
+function rankPriceIds() {
+  const f = rankFilter;
+  const ids = new Set();
+  let needBars = false, needPlanks = false, hasRoyal = false;
+  for (const v of GD.variants) {
+    if (f.cat && (v.cat || 'plate') !== f.cat) continue;
+    if (f.variant && v.code !== f.variant) continue;
+    for (const p of piecesOf(v)) {
+      if (f.piece && p.slot !== f.piece) continue;
+      const req = matReq(v, p);
+      if (req.bars > 0 || v.royal) needBars = true;
+      if (req.planks > 0) needPlanks = true;
+      if (v.royal) hasRoyal = true;
+      for (const k of TIERS) {
+        const [t, e] = tv(k);
+        if (f.tier && t !== Number(f.tier)) continue;
+        if (f.ench !== '' && e !== Number(f.ench)) continue;
+        ids.add(itemId(v.code, p.slot, k));
+        if (v.artifact) {
+          const a = artOf(v.code, p.slot, t);
+          if (a) ids.add(a.id);
+        }
+        if (v.royal && GD.royal) {
+          const sig = GD.royal.sigils[t];
+          if (sig) ids.add(sig.id);
+          for (const bCode of GD.royal.baseSets) ids.add(itemId(bCode, p.slot, k));
+        }
+      }
+    }
+  }
+  BAR_KEYS.forEach(k => {
+    if (needBars) { ids.add(oreId(k)); ids.add(barId(k)); }
+    if (needPlanks) { ids.add(woodId(k)); ids.add(plankId(k)); }
+  });
+  return [...ids];
+}
 function foodIds() {
   const ids = new Set();
   if (GD.foods) {
@@ -2680,51 +2848,255 @@ function foodMealIds() {
   }
   return [...ids];
 }
+
+function hasAnyPrice(id) {
+  const p = ST.prices && ST.prices[id];
+  if (p && Object.values(p).some(v => v > 0)) return true;
+  const qp = ST.qualityPrices && ST.qualityPrices[id];
+  if (qp) {
+    for (const qMap of Object.values(qp)) {
+      if (qMap && Object.values(qMap).some(v => v > 0)) return true;
+    }
+  }
+  return false;
+}
+
+function hasAnyVol(id) {
+  const v = ST.volumes && ST.volumes[id];
+  return !!(v && Object.keys(v).length > 0);
+}
+
+function getCoverageStats() {
+  const all = allIds();
+  const mats = baseMaterialAndArtIds();
+  const gears = gearIds();
+  const countPriced = arr => arr.filter(hasAnyPrice).length;
+  const plateGears = [];
+  const bowGears = [];
+  const xbowGears = [];
+  for (const v of GD.variants) {
+    const cat = v.cat || 'plate';
+    for (const p of piecesOf(v)) {
+      for (const k of TIERS) {
+        const id = itemId(v.code, p.slot, k);
+        if (cat === 'plate') plateGears.push(id);
+        else if (cat === 'bow') bowGears.push(id);
+        else if (cat === 'crossbow') xbowGears.push(id);
+      }
+    }
+  }
+  const priced = countPriced(all);
+  const volumed = gears.filter(hasAnyVol).length;
+  return {
+    total: all.length,
+    priced,
+    pricePct: all.length ? Math.round((priced / all.length) * 100) : 0,
+    gearTotal: gears.length,
+    volumed,
+    volPct: gears.length ? Math.round((volumed / gears.length) * 100) : 0,
+    matTotal: mats.length,
+    matPriced: countPriced(mats),
+    plateTotal: plateGears.length,
+    platePriced: countPriced(plateGears),
+    bowTotal: bowGears.length,
+    bowPriced: countPriced(bowGears),
+    xbowTotal: xbowGears.length,
+    xbowPriced: countPriced(xbowGears),
+  };
+}
+
+function getItemLastFetchedTs(id, isVol = false) {
+  if (isVol) {
+    const t = ST.volFetchedAt && ST.volFetchedAt[id];
+    if (t) return t;
+    return hasAnyVol(id) ? 1 : 0;
+  } else {
+    const t = ST.priceFetchedAt && ST.priceFetchedAt[id];
+    if (t) return t;
+    if (hasAnyPrice(id)) {
+      const dates = ST.dates && ST.dates[id] ? Object.values(ST.dates[id]) : [];
+      if (dates.length) {
+        const maxD = Math.max(...dates.map(d => new Date(d + (String(d).endsWith('Z') ? '' : 'Z')).getTime() || 1));
+        return maxD > 0 ? maxD : 1;
+      }
+      return 1;
+    }
+    return 0;
+  }
+}
+
+function filterAndPrioritizeIds(ids, isVol = false, forceAll = false) {
+  const unique = [...new Set(ids)];
+  const mode = forceAll ? 'force_all' : (ST.config.fetchFreshness || 'smart_60');
+  const now = Date.now();
+
+  // Para buscas pequenas e pontuais (<= 35 itens, ex: aba Minério ou Plano curto), sempre consulta todos os itens pedidos
+  const isSmallTargetedFetch = unique.length <= 35;
+
+  let filtered = unique;
+  if (!isSmallTargetedFetch && mode !== 'force_all') {
+    if (mode === 'missing_only') {
+      filtered = unique.filter(id => !(isVol ? hasAnyVol(id) : hasAnyPrice(id)));
+    } else {
+      const maxAgeMin = mode === 'smart_15' ? 15 : mode === 'smart_360' ? 360 : 60;
+      const cutoff = now - maxAgeMin * 60 * 1000;
+      filtered = unique.filter(id => {
+        const hasData = isVol ? hasAnyVol(id) : hasAnyPrice(id);
+        const fetchedAt = isVol ? (ST.volFetchedAt && ST.volFetchedAt[id]) : (ST.priceFetchedAt && ST.priceFetchedAt[id]);
+        if (!hasData && (!fetchedAt || fetchedAt < cutoff)) return true;
+        if (!fetchedAt) return true;
+        return fetchedAt < cutoff;
+      });
+    }
+  }
+
+  // Se todos os itens já estavam recentes pelo filtro, avisa e prioriza os mais antigos caso o usuário queira forçar
+  const skippedCount = unique.length - filtered.length;
+
+  // Ordena por prioridade:
+  // 1º: Itens sem nenhum preço/volume salvo e nunca consultados
+  // 2º: Materiais/Artefatos antes de equipamentos (garante que o cálculo de custo funcione imediatamente!)
+  // 3º: Itens consultados há mais tempo (menor timestamp)
+  const isMatOrArt = id => /^(T\d+_(ORE|METALBAR|WOOD|PLANKS)|.*ARTEFACT.*|.*TOKEN_ROYAL.*)$/.test(id);
+  filtered.sort((a, b) => {
+    const hasA = isVol ? hasAnyVol(a) : hasAnyPrice(a);
+    const hasB = isVol ? hasAnyVol(b) : hasAnyPrice(b);
+    if (hasA !== hasB) return hasA ? 1 : -1;
+    const matA = isMatOrArt(a);
+    const matB = isMatOrArt(b);
+    if (matA !== matB) return matA ? -1 : 1;
+    const tsA = getItemLastFetchedTs(a, isVol);
+    const tsB = getItemLastFetchedTs(b, isVol);
+    return tsA - tsB;
+  });
+
+  return { list: filtered, skippedCount, totalRequested: unique.length };
+}
+
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 let FETCHING = false;
-function chunkIds(ids, maxLen = 3500) {          // lotes limitados pelo tamanho da URL => menos requisições
+let CANCEL_FETCH = false;
+
+function cancelActiveFetch() {
+  if (!FETCHING) return;
+  CANCEL_FETCH = true;
+  toast('⏹ Parando busca após concluir o lote atual… Todos os dados já recebidos foram salvos!', 4000);
+}
+
+function chunkIds(ids, maxLen = 2000) {
   const out = []; let cur = [], len = 0;
   for (const id of ids) {
     if (cur.length && len + id.length + 3 > maxLen) { out.push(cur); cur = []; len = 0; }
-    cur.push(id); len += id.length + 3;          // +3 = vírgula codificada (%2C)
+    cur.push(id); len += id.length + 3;
   }
   if (cur.length) out.push(cur);
   return out;
 }
-async function fetchChunk(ch, locs, progress) {
-  const url = `/api/prices?server=${ST.config.server}&items=${encodeURIComponent(ch.join(','))}&locations=${encodeURIComponent(locs)}`;
-  for (let attempt = 1; attempt <= 6; attempt++) {
-    const r = await fetch(url);
-    const data = await r.json().catch(() => ({ error: 'resposta inválida' }));
-    if (r.ok && !data.error) return data;
-    if (r.status === 429 || r.status === 503) {   // limite da API: espera e tenta de novo
-      let wait = Number(data.retryAfter) || Math.min(15 * attempt, 60);
-      for (; wait > 0; wait--) { toast(`Limite da API atingido — aguardando ${wait}s (tentativa ${attempt}/6)… ${progress}`, 2000); await sleep(1000); }
+
+function classifyPriceItem(id) {
+  if (/^(T\d+_(ORE|METALBAR|WOOD|PLANKS)|.*ARTEFACT.*|.*TOKEN_ROYAL.*)$/.test(id)) return 'material';
+  if (id.includes('_MEAL_') || id.includes('_MEAT') || id.includes('_FARM_') || id.includes('FISHSAUCE') || id.includes('FLOUR') || id.includes('BREAD') || id.includes('BUTTER') || /^(T\d+_(CARROT|BEAN|WHEAT|TURNIP|CABBAGE|POTATO|CORN|PUMPKIN|EGG|MILK))/.test(id)) return 'food';
+  return 'gear';
+}
+
+async function fetchPriceChunkWithSplit(ch, locs, qualities, progressLabel) {
+  if (CANCEL_FETCH) return [];
+  const url = `/api/prices?server=${ST.config.server}&items=${encodeURIComponent(ch.join(','))}&locations=${encodeURIComponent(locs)}&qualities=${encodeURIComponent(qualities)}`;
+  for (let attempt = 1; attempt <= 10; attempt++) {
+    if (CANCEL_FETCH) return [];
+    let r, data;
+    try {
+      r = await fetch(url);
+      data = await r.json().catch(() => ({ error: 'resposta inválida' }));
+    } catch (netErr) {
+      r = { ok: false, status: 503 };
+      data = { error: netErr.message };
+    }
+    if (r.ok && Array.isArray(data)) return data;
+
+    // Se o servidor da API retornou erro de tamanho/timeout (414, 502, 503, 504) e o lote tem > 6 itens, divide o lote ao meio!
+    if ((r.status === 414 || r.status === 502 || r.status === 503 || r.status === 504) && ch.length > 6 && attempt >= 2) {
+      const mid = Math.ceil(ch.length / 2);
+      toast(`⚡ Dividindo lote grande (${ch.length} → ${mid}+${ch.length - mid} itens) para evitar timeout… ${progressLabel}`, 4000);
+      await sleep(1200);
+      const left = await fetchPriceChunkWithSplit(ch.slice(0, mid), locs, qualities, progressLabel + ' [A]');
+      if (CANCEL_FETCH) return left;
+      await sleep(1400);
+      const right = await fetchPriceChunkWithSplit(ch.slice(mid), locs, qualities, progressLabel + ' [B]');
+      return [...left, ...right];
+    }
+
+    if (r.status === 429 || r.status === 502 || r.status === 503 || r.status === 504) {
+      let wait = Number(data && data.retryAfter) || Math.min(12 * attempt, 65);
+      for (; wait > 0; wait--) {
+        if (CANCEL_FETCH) return [];
+        toast(`⏳ Limite/sobrecarga da API (${r.status}) — retomando em ${wait}s (tentativa ${attempt}/10)… ${progressLabel}`, 2000);
+        await sleep(1000);
+      }
       continue;
     }
-    throw new Error(data.error || `HTTP ${r.status}`);
+    throw new Error((data && data.error) || `HTTP ${r.status}`);
   }
-  throw new Error('limite da API persistiu após várias tentativas; tente novamente em alguns minutos');
+  throw new Error('Limite da API persistiu após várias tentativas; aguarde 1 minuto e clique novamente (o progresso já foi salvo!).');
 }
-async function fetchPrices(ids) {
+
+async function fetchPrices(ids, opts = {}) {
+  if (!ids || !ids.length) return toast('Nenhum item selecionado para buscar preços.');
   if (FETCHING) return toast('Já existe uma busca em andamento…');
+
+  const { list, skippedCount, totalRequested } = filterAndPrioritizeIds(ids, false, opts.forceAll);
+  if (!list.length) {
+    return toast(`✓ Todos os ${totalRequested} itens já foram consultados recentemente! (Mude "Modo Coleta API" para "Forçar Tudo" se quiser reconsultar).`, 6000);
+  }
+
   FETCHING = true;
-  document.querySelectorAll('#fetchAll,#fetchTab,#fetchPlan').forEach(b => b.disabled = true);
-  const locs = GD.saleLocs.join(',');
+  CANCEL_FETCH = false;
+  ST.priceFetchedAt = ST.priceFetchedAt || {};
+  render();
+
+  // Separa os itens por perfil de consulta na API:
+  // 1. Materiais/Artefatos/Emblemas -> Apenas Q1 e apenas nas 5 Cidades Reais (5x mais leve!)
+  // 2. Comidas/Ingredientes -> Apenas Q1 em todas as praças
+  // 3. Equipamentos (Placas/Arcos/Bestas) -> Q1 a Q5 em todas as praças, em lotes menores (1400 chars) anti-timeout
+  const matIds = [], foodItemIds = [], equipIds = [];
+  for (const id of list) {
+    const kind = classifyPriceItem(id);
+    if (kind === 'material') matIds.push(id);
+    else if (kind === 'food') foodItemIds.push(id);
+    else equipIds.push(id);
+  }
+
+  const jobs = [];
+  for (const ch of chunkIds(matIds, 2400)) {
+    jobs.push({ ch, locs: GD.cities.join(','), qualities: '1', label: 'Materiais/Artefatos' });
+  }
+  for (const ch of chunkIds(foodItemIds, 2200)) {
+    jobs.push({ ch, locs: GD.saleLocs.join(','), qualities: '1', label: 'Culinária' });
+  }
+  for (const ch of chunkIds(equipIds, 1450)) {
+    jobs.push({ ch, locs: GD.saleLocs.join(','), qualities: '1,2,3,4,5', label: 'Equipamentos Q1-Q5' });
+  }
+
   let got = 0, done = 0;
-  const chunks = chunkIds(ids);
   try {
-    for (let i = 0; i < chunks.length; i++) {
-      const ch = chunks[i];
-      const progress = `lote ${i + 1}/${chunks.length}`;
-      toast(`Buscando preços (Q1-Q5)… ${Math.round(done / ids.length * 100)}% (${progress})`, 60000);
-      const data = await fetchChunk(ch, locs, progress);
+    for (let i = 0; i < jobs.length; i++) {
+      if (CANCEL_FETCH) break;
+      const job = jobs[i];
+      const progress = `lote ${i + 1}/${jobs.length} · ${job.label}`;
+      const skipMsg = skippedCount > 0 ? ` [${skippedCount} recentes pulados]` : '';
+      toast(`🔄 Buscando preços… ${Math.round(done / list.length * 100)}% (${progress})${skipMsg}`, 60000);
+
+      const data = await fetchPriceChunkWithSplit(job.ch, job.locs, job.qualities, progress);
+      if (CANCEL_FETCH && !data.length) break;
+
+      const nowTs = Date.now();
+      for (const id of job.ch) ST.priceFetchedAt[id] = nowTs;
+
       for (const e of data) {
-        const isGear = !(/^(T\d+_(ORE|METALBAR|WOOD|PLANKS)|.*ARTEFACT.*|.*TOKEN_ROYAL.*)$/.test(e.item_id));
-        const isFoodRelated = (e.item_id.includes('_MEAL_') || e.item_id.includes('_MEAT') || e.item_id.includes('_FARM_') || e.item_id.includes('FISHSAUCE') || e.item_id.includes('FLOUR') || e.item_id.includes('BREAD') || e.item_id.includes('BUTTER') || /^(T\d+_(CARROT|BEAN|WHEAT|TURNIP|CABBAGE|POTATO|CORN|PUMPKIN|EGG|MILK))/.test(e.item_id));
+        const kind = classifyPriceItem(e.item_id);
         const loc = e.city;
         if (!GD.saleLocs.includes(loc)) continue;
-        if (!isGear && !isFoodRelated && !GD.cities.includes(loc)) continue;
+        if (kind === 'material' && !GD.cities.includes(loc)) continue;
         let price = e.sell_price_min, date = e.sell_price_min_date;
         if (loc === 'Black Market') { price = e.buy_price_max; date = e.buy_price_max_date; }
         const q = String(e.quality || 1);
@@ -2748,16 +3120,21 @@ async function fetchPrices(ids) {
           got++;
         }
       }
-      done += ch.length;
-      save();                                     // salva o progresso parcial
-      if (i < chunks.length - 1) await sleep(1500); // respeita o limite da API
+      done += job.ch.length;
+      ST.lastFetch = new Date().toISOString();
+      save();
+      if (i < jobs.length - 1 && !CANCEL_FETCH) await sleep(1650);
     }
-    ST.lastFetch = new Date().toISOString();
-    toast(`✓ ${got} preços atualizados (${ids.length} itens consultados em todas as qualidades).`);
+    if (CANCEL_FETCH) {
+      toast(`⏹ Busca pausada pelo usuário: ${got} cotações salvas (${done}/${list.length} itens processados). Clique novamente quando quiser continuar de onde parou!`, 6000);
+    } else {
+      toast(`✓ ${got} preços atualizados (${done} itens consultados${skippedCount ? `, ${skippedCount} recentes mantidos` : ''}).`, 5000);
+    }
   } catch (err) {
-    toast(`Erro ao buscar preços: ${err.message}. ${got} preços obtidos antes do erro foram mantidos.`, 8000);
+    toast(`⚠️ ${err.message} (${got} preços obtidos em ${done}/${list.length} itens foram salvos; clique novamente para continuar de onde parou!).`, 9000);
   } finally {
     FETCHING = false;
+    CANCEL_FETCH = false;
     changed();
   }
 }
@@ -2819,35 +3196,78 @@ function currentGearTabIds() {
   return ids;
 }
 
-async function fetchVolumes(ids) {
+async function fetchHistoryChunkWithSplit(ch, locs, progressLabel) {
+  if (CANCEL_FETCH) return [];
+  const url = `/api/history?server=${ST.config.server}&items=${encodeURIComponent(ch.join(','))}&locations=${encodeURIComponent(locs)}`;
+  for (let attempt = 1; attempt <= 10; attempt++) {
+    if (CANCEL_FETCH) return [];
+    let r, data;
+    try {
+      r = await fetch(url);
+      data = await r.json().catch(() => ({ error: 'resposta inválida' }));
+    } catch (netErr) {
+      r = { ok: false, status: 503 };
+      data = { error: netErr.message };
+    }
+    if (r.ok && Array.isArray(data)) return data;
+
+    // Se o lote de histórico deu timeout (502/503/504) ou URL longa (414) e tem > 5 itens, divide ao meio!
+    if ((r.status === 414 || r.status === 502 || r.status === 503 || r.status === 504) && ch.length > 5 && attempt >= 2) {
+      const mid = Math.ceil(ch.length / 2);
+      toast(`⚡ Dividindo lote de histórico (${ch.length} → ${mid}+${ch.length - mid} itens) para evitar timeout… ${progressLabel}`, 4000);
+      await sleep(1500);
+      const left = await fetchHistoryChunkWithSplit(ch.slice(0, mid), locs, progressLabel + ' [A]');
+      if (CANCEL_FETCH) return left;
+      await sleep(1800);
+      const right = await fetchHistoryChunkWithSplit(ch.slice(mid), locs, progressLabel + ' [B]');
+      return [...left, ...right];
+    }
+
+    if (r.status === 429 || r.status === 502 || r.status === 503 || r.status === 504) {
+      let wait = Number(data && data.retryAfter) || Math.min(15 * attempt, 70);
+      for (; wait > 0; wait--) {
+        if (CANCEL_FETCH) return [];
+        toast(`⏳ Limite da API de Histórico (${r.status}) — aguardando ${wait}s (tentativa ${attempt}/10)… ${progressLabel}`, 2000);
+        await sleep(1000);
+      }
+      continue;
+    }
+    throw new Error((data && data.error) || `HTTP ${r.status}`);
+  }
+  throw new Error('Limite da API de histórico persistiu; aguarde 1 minuto e clique novamente para continuar de onde parou.');
+}
+
+async function fetchVolumes(ids, opts = {}) {
   if (!ids || !ids.length) return toast('Nenhum item selecionado para buscar volume.');
   if (FETCHING) return toast('Já existe uma busca em andamento…');
+
+  const { list, skippedCount, totalRequested } = filterAndPrioritizeIds(ids, true, opts.forceAll);
+  if (!list.length) {
+    return toast(`✓ Todos os ${totalRequested} itens já tiveram volume consultado recentemente! (Use "Forçar Tudo" se quiser atualizar novamente).`, 6000);
+  }
+
   FETCHING = true;
-  document.querySelectorAll('#fetchAll,#fetchTab,#fetchPlan,#fetchVolumesRank,#fetchPlanVolumes,#fetchGearVolumes,#fetchGearVolumesAll,#fetchMaterialsVolume,#fetchOreVolumes,#fetchBarVolumes,#fetchWoodVolumes,#fetchPlankVolumes').forEach(b => b.disabled = true);
+  CANCEL_FETCH = false;
+  ST.volFetchedAt = ST.volFetchedAt || {};
+  render();
+
   const locs = GD.saleLocs.join(',');
   let got = 0, done = 0;
-  const chunks = chunkIds(ids, 1200);
+  // Lotes menores (750 chars ≈ 28-32 itens) evitam 502/504 Gateway Timeout e 429 no endpoint /stats/history/
+  const chunks = chunkIds(list, 750);
   try {
     for (let i = 0; i < chunks.length; i++) {
+      if (CANCEL_FETCH) break;
       const ch = chunks[i];
       const progress = `lote ${i + 1}/${chunks.length}`;
-      toast(`📊 Buscando volumes diários & VWAP… ${Math.round(done / ids.length * 100)}% (${progress})`, 60000);
-      const url = `/api/history?server=${ST.config.server}&items=${encodeURIComponent(ch.join(','))}&locations=${encodeURIComponent(locs)}`;
-      let data = null;
-      for (let attempt = 1; attempt <= 6; attempt++) {
-        const r = await fetch(url);
-        data = await r.json().catch(() => ({ error: 'resposta inválida' }));
-        if (r.ok && !data.error) break;
-        if (r.status === 429 || r.status === 503) {
-          let wait = Number(data.retryAfter) || Math.min(15 * attempt, 60);
-          for (; wait > 0; wait--) {
-            toast(`Limite da API — aguardando ${wait}s (tentativa ${attempt}/6)… ${progress}`, 2000);
-            await sleep(1000);
-          }
-          continue;
-        }
-        throw new Error(data.error || `HTTP ${r.status}`);
-      }
+      const skipMsg = skippedCount > 0 ? ` [${skippedCount} recentes pulados]` : '';
+      toast(`📊 Buscando volumes diários & VWAP… ${Math.round(done / list.length * 100)}% (${progress})${skipMsg}`, 60000);
+
+      const data = await fetchHistoryChunkWithSplit(ch, locs, progress);
+      if (CANCEL_FETCH && !data.length) break;
+
+      const nowTs = Date.now();
+      for (const id of ch) ST.volFetchedAt[id] = nowTs;
 
       if (Array.isArray(data)) {
         for (const entry of data) {
@@ -2863,13 +3283,18 @@ async function fetchVolumes(ids) {
       }
       done += ch.length;
       save();
-      if (i < chunks.length - 1) await sleep(1200);
+      if (i < chunks.length - 1 && !CANCEL_FETCH) await sleep(2100);
     }
-    toast(`✓ Volumes e preços médios de ${got} séries atualizados (${ids.length} itens consultados).`);
+    if (CANCEL_FETCH) {
+      toast(`⏹ Busca de volumes pausada: ${got} séries salvas (${done}/${list.length} itens verificados). Clique novamente quando quiser continuar!`, 6000);
+    } else {
+      toast(`✓ Volumes e VWAP de ${got} séries atualizados (${done} itens verificados${skippedCount ? `, ${skippedCount} recentes mantidos` : ''}).`, 5000);
+    }
   } catch (err) {
-    toast(`Erro ao buscar volumes: ${err.message}. Dados obtidos foram mantidos.`, 8000);
+    toast(`⚠️ ${err.message} (${got} séries obtidas em ${done}/${list.length} itens foram salvas; clique novamente para continuar de onde parou!).`, 9000);
   } finally {
     FETCHING = false;
+    CANCEL_FETCH = false;
     changed();
   }
 }
@@ -3189,7 +3614,7 @@ function bind() {
     if (d.origin) { ST.origins[d.origin] = el.value; return changed(); }
     if (d.plankorigin) { ST.plankOrigins = ST.plankOrigins || {}; ST.plankOrigins[d.plankorigin] = el.value; return changed(); }
     if (d.cfg) {
-      if (d.cfg === 'server' || d.cfg === 'materialPricing' || d.cfg === 'targetQuality') {
+      if (d.cfg === 'server' || d.cfg === 'materialPricing' || d.cfg === 'targetQuality' || d.cfg === 'fetchFreshness') {
         ST.config[d.cfg] = el.value;
       } else {
         ST.config[d.cfg] = (d.pct === '1' ? Number(el.value) / 100 : Number(el.value));
@@ -3218,8 +3643,13 @@ function bind() {
       return render();
     }
     if (d.ff) {
-      if (d.ff === 'dailyBonus') {
+      if (d.ff === 'dailyBonus' || d.ff === 'dailyBonus1') {
         ST.activeDailyBonus = el.value;
+        save();
+        updateHeaderDailyBonusSelect();
+        return render();
+      } else if (d.ff === 'dailyBonus2') {
+        ST.activeDailyBonus2 = el.value;
         save();
         updateHeaderDailyBonusSelect();
         return render();
@@ -3263,6 +3693,7 @@ function bind() {
   view.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.matches('input.num')) e.target.blur(); });
   view.addEventListener('click', e => {
     const t = e.target.closest('button'); if (!t) return;
+    if (t.id === 'cancelFetchBtn') return cancelActiveFetch();
     if (t.id === 'addPlan') { const last = ST.plan[ST.plan.length - 1]; ST.plan.push(last ? { ...last } : { code: 'SET1', slot: 'ARMOR', k: '4.0', qty: 10 }); return changed(); }
     if (t.id === 'clearPlan') { if (confirm('Limpar todo o plano?')) { ST.plan = []; changed(); } return; }
     if (t.dataset.del !== undefined) { ST.plan.splice(Number(t.dataset.del), 1); return changed(); }
@@ -3309,6 +3740,11 @@ function bind() {
     if (t.id === 'fetchAll') return fetchPrices(allIds());
     if (t.id === 'fetchTab') return fetchPrices(tabIds());
     if (t.id === 'fetchPlan') return fetchPrices(planIds());
+    if (t.id === 'fetchPricesRank') return fetchPrices(rankPriceIds());
+    if (t.id === 'fetchBaseMaterialsPrices') return fetchPrices(baseMaterialAndArtIds());
+    if (t.id === 'fetchCatPlate') return fetchPrices(categoryCraftIds('plate'));
+    if (t.id === 'fetchCatBow') return fetchPrices(categoryCraftIds('bow'));
+    if (t.id === 'fetchCatCrossbow') return fetchPrices(categoryCraftIds('crossbow'));
     if (t.id === 'fetchVolumesRank') return fetchVolumes(rankGearIds());
     if (t.id === 'fetchPlanVolumes') return fetchVolumes(planAllIds());
     if (t.id === 'fetchGearVolumes') return fetchVolumes(currentGearTabIds());
@@ -3351,6 +3787,16 @@ function bind() {
     }
   });
 
+  $('#headerDailyBonusSelect1')?.addEventListener('change', e => {
+    ST.activeDailyBonus = e.target.value;
+    save();
+    render();
+  });
+  $('#headerDailyBonusSelect2')?.addEventListener('change', e => {
+    ST.activeDailyBonus2 = e.target.value;
+    save();
+    render();
+  });
   $('#headerDailyBonusSelect')?.addEventListener('change', e => {
     ST.activeDailyBonus = e.target.value;
     save();
@@ -3424,8 +3870,12 @@ async function checkLiveStatus() {
   [GD, ST] = await Promise.all([fetch('/api/gamedata').then(r => r.json()), fetch('/api/state').then(r => r.json())]);
   ST.prices ??= {}; ST.dates ??= {}; ST.origins ??= {}; ST.plankOrigins ??= {}; ST.plan ??= []; ST.volumes ??= {};
   ST.qualityPrices ??= {}; ST.qualityDates ??= {}; ST.qualityAmounts ??= {}; ST.amounts ??= {};
+  ST.priceFetchedAt ??= {}; ST.volFetchedAt ??= {};
   ST.foodPlan ??= [];
+  const legacyMap = { forge: 'plate_armor', hunter: 'bow', mage: 'firestaff' };
+  if (ST.activeDailyBonus && legacyMap[ST.activeDailyBonus]) ST.activeDailyBonus = legacyMap[ST.activeDailyBonus];
   ST.activeDailyBonus ??= 'none';
+  ST.activeDailyBonus2 ??= 'none';
   ST.foodConfig = {
     city: 'Caerleon',
     focus: false,
@@ -3441,7 +3891,7 @@ async function checkLiveStatus() {
   foodFilter.autoArbitrage = ST.foodConfig.autoArbitrage !== false;
   ST.config = {
     taxBuy: 0, taxSell: 0.065, retRefine: 0.367, retCraft: 0.248, feeRefine: 465, feeCraft: 465,
-    server: 'west', materialPricing: 'smart', targetQuality: 'mix',
+    server: 'west', materialPricing: 'smart', targetQuality: 'mix', fetchFreshness: 'smart_60',
     ...ST.config
   };
   rankFilter.quality = rankFilter.quality || ST.config.targetQuality || 'mix';

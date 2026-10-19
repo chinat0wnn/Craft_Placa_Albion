@@ -172,7 +172,9 @@ button.icon:hover{color:var(--red)}
 /* Bônus Diários e Nutrição */
 .daily-bonus-nav{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;background:var(--panel2);border:1px solid var(--line);border-radius:20px;font-size:12px;white-space:nowrap}
 .daily-bonus-nav .bonus-label{color:var(--accent);font-weight:700}
-.daily-bonus-nav select.bonus-select{background:transparent;border:0;color:var(--text);font-size:12px;padding:2px 4px;font-weight:600;cursor:pointer}
+.daily-bonus-nav .bonus-sep{color:var(--muted);font-weight:700;padding:0 2px}
+.daily-bonus-nav select.bonus-select{background:transparent;border:0;color:var(--text);font-size:12px;padding:2px 4px;font-weight:600;cursor:pointer;max-width:195px}
+.daily-bonus-nav select.bonus-select option,.daily-bonus-nav select.bonus-select optgroup{background:var(--panel);color:var(--text)}
 .daily-bonus-nav select.bonus-select:focus{outline:none}
 .bonus-hero{background:linear-gradient(135deg,#1f1a10 0%,#2a1e12 50%,#1a1d26 100%);border:1px solid rgba(224,163,58,0.4);border-radius:12px;padding:18px 20px;margin-bottom:16px;box-shadow:0 8px 24px rgba(0,0,0,0.3)}
 .bonus-hero h3{color:var(--accent);margin:0 0 6px;font-size:16px;display:flex;align-items:center;gap:8px}
@@ -181,6 +183,7 @@ button.icon:hover{color:var(--red)}
 .building-icon{width:32px;height:32px;border-radius:6px;background:var(--panel2);border:1px solid var(--line);vertical-align:middle;margin-right:6px}
 .nutri-pill{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;background:#17283c;color:#5aa9ff;border:1px solid rgba(90,169,255,0.4)}
 .nutri-pill.x2{background:#231a38;color:#d29bff;border:1px solid rgba(210,155,255,0.5)}
+
 
 
 

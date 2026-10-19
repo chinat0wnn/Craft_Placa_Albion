@@ -4,7 +4,7 @@ Uso:  python server.py   ->  http://127.0.0.1:8765
 """
 from datetime import datetime
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
-import json, os, threading, urllib.error, urllib.parse, urllib.request, webbrowser
+import gzip, json, os, threading, time, urllib.error, urllib.parse, urllib.request, webbrowser
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 STATIC = os.path.join(HERE, "static")
@@ -13,6 +13,33 @@ GAMEDATA = os.path.join(HERE, "gamedata.json")
 PORT = 8765
 API_HOSTS = {"west": "west", "east": "east", "europe": "europe"}
 lock = threading.Lock()
+api_cache = {}
+API_CACHE_TTL = 300  # 5 minutos de cache em memoria para evitar requisicoes repetidas
+
+def fetch_aodp_json(api_url, timeout=35):
+    now = time.time()
+    with lock:
+        cached = api_cache.get(api_url)
+        if cached and (now - cached[0]) < API_CACHE_TTL:
+            return cached[1]
+    req = urllib.request.Request(
+        api_url,
+        headers={
+            "User-Agent": "AlbionCraftLocal/2.0",
+            "Accept": "application/json",
+            "Accept-Encoding": "gzip",
+        },
+    )
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        raw = r.read()
+        if r.headers.get("Content-Encoding") == "gzip" or (raw[:2] == b"\x1f\x8b"):
+            raw = gzip.decompress(raw)
+        data = json.loads(raw.decode("utf-8"))
+    with lock:
+        if len(api_cache) > 500:
+            api_cache.clear()
+        api_cache[api_url] = (now, data)
+    return data
 
 LOCATIONS = {
     4: "Swamp Cross",
@@ -98,15 +125,14 @@ class Handler(SimpleHTTPRequestHandler):
             api = (f"https://{host}.albion-online-data.com/api/v2/stats/prices/"
                    f"{urllib.parse.quote(items, safe=',@_')}.json?locations={urllib.parse.quote(locs, safe=',')}&qualities={urllib.parse.quote(qualities, safe=',')}")
             try:
-                req = urllib.request.Request(api, headers={"User-Agent": "AlbionCraftLocal/1.0"})
-                with urllib.request.urlopen(req, timeout=30) as r:
-                    return self._json(json.loads(r.read().decode("utf-8")))
+                return self._json(fetch_aodp_json(api, timeout=35))
             except urllib.error.HTTPError as e:
                 retry = e.headers.get("Retry-After") if e.headers else None
+                code = e.code if e.code in (414, 429, 502, 503, 504) else 502
                 return self._json({"error": f"HTTP {e.code}: {e.reason}", "status": e.code,
-                                   "retryAfter": retry}, e.code if e.code in (429, 503) else 502)
+                                   "retryAfter": retry, "retryable": True}, code)
             except Exception as e:
-                return self._json({"error": str(e)}, 502)
+                return self._json({"error": str(e), "status": 503, "retryable": True}, 503)
         if url.path == "/api/history":
             q = urllib.parse.parse_qs(url.query)
             host = API_HOSTS.get(q.get("server", ["west"])[0], "west")
@@ -116,15 +142,14 @@ class Handler(SimpleHTTPRequestHandler):
             api = (f"https://{host}.albion-online-data.com/api/v2/stats/history/"
                    f"{urllib.parse.quote(items, safe=',@_')}.json?locations={urllib.parse.quote(locs, safe=',')}&qualities={urllib.parse.quote(qualities, safe=',')}&time-scale=24")
             try:
-                req = urllib.request.Request(api, headers={"User-Agent": "AlbionCraftLocal/1.0"})
-                with urllib.request.urlopen(req, timeout=30) as r:
-                    return self._json(json.loads(r.read().decode("utf-8")))
+                return self._json(fetch_aodp_json(api, timeout=40))
             except urllib.error.HTTPError as e:
                 retry = e.headers.get("Retry-After") if e.headers else None
+                code = e.code if e.code in (414, 429, 502, 503, 504) else 502
                 return self._json({"error": f"HTTP {e.code}: {e.reason}", "status": e.code,
-                                   "retryAfter": retry}, e.code if e.code in (429, 503) else 502)
+                                   "retryAfter": retry, "retryable": True}, code)
             except Exception as e:
-                return self._json({"error": str(e)}, 502)
+                return self._json({"error": str(e), "status": 503, "retryable": True}, 503)
         return super().do_GET()
 
     def do_POST(self):

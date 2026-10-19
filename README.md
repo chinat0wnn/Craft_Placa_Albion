@@ -84,10 +84,13 @@ Sistema integrado de **Refino de Minérios e Madeiras**, **Craft de Equipamentos
    - **100% Seguro e em Conformidade com as Regras (TOS) da Sandbox Interactive:** Funciona por monitoramento passivo de pacotes de rede locais (via driver Npcap), **sem injetar código nem tocar na memória do cliente do jogo**.
    - Integração direta: alimenta o servidor local em `/api/ingest`, atualizando as tabelas e o ranking de lucro no navegador instantaneamente com alertas visuais.
 
-9. **Busca Automática via API Pública:**
+9. **Busca Automática Inteligente via API Pública (Anti-Rate-Limit & Auto-Split):**
    - Integração com a API pública do **Albion Online Data Project** (servidores *Américas / West*, *Europa* e *Ásia / East*).
-   - Envio em lotes otimizados com pausa automática (*throttle*) e tratamento com retentativa inteligente para evitar erros de limite de requisições (`HTTP 429`).
-   - Indicação visual de preços desatualizados (> 48h) e suporte a edição manual de qualquer valor.
+   - **Separação Inteligente de Consultas:** Materiais, artefatos, emblemas e comidas são consultados apenas em `Qualidade 1 (Q1)` (5× mais leve), enquanto equipamentos consultam `Q1 a Q5` em lotes otimizados.
+   - **Coleta Incremental com Retomada Automática:** Registra o horário de consulta de cada item (`priceFetchedAt` / `volFetchedAt`) e prioriza itens faltantes e mais antigos primeiro. Modos configuráveis: `⚡ Inteligente (> 1h)`, `⚡ Rápido (> 15 min)`, `🛡️ Econômico (> 6h)`, `🎯 Só Faltantes` e `🔄 Forçar Tudo`.
+   - **Auto-Split Anti-Timeout & Backoff Resiliente:** Divide lotes automaticamente ao meio se a API retornar erro `414`/`502`/`503`/`504` e aguarda com contagem regressiva em caso de `HTTP 429`, salvando o progresso parcial a cada lote e permitindo interromper a qualquer momento com o botão **`⏹ Parar busca`**.
+   - **Atalhos Rápidos por Categoria:** Botões dedicados para buscar apenas **`📦 Só Materiais & Artefatos`**, **`🛡️ Só Placas`**, **`🏹 Só Arcos`**, **`🎯 Só Bestas`** ou **`↻ Buscar preços (deste filtro)`** diretamente na aba de Ranking.
+   - **Compressão Gzip & Cache Local:** O servidor Python requisita respostas comprimidas (`gzip`) e mantém cache em memória de 5 minutos para eliminar requisições repetidas.
 
 10. **🍲 Culinária & Craft de Comidas (84 combinações Meta .0 a .3):**
     - Suporte completo às 7 famílias principais de comida do Albion Online:
@@ -128,12 +131,9 @@ Sistema integrado de **Refino de Minérios e Madeiras**, **Craft de Equipamentos
         - 🐎 **Cavalariça / Selaria (`STABLE`):** Guisado de Cabra T4 (`T4_MEAL_STEW`) $\rightarrow$ 266 nutrição (2x).
         - ✨ **Forja de Artefatos (`MELDBUILDING`):** Salada de Batata T6 (`T6_MEAL_SALAD`) $\rightarrow$ 886 nutrição (2x).
         - 🔧 **Oficina de Reparos (`REPAIRSHOP`):** Sanduíche de Cabra T4 (`T4_MEAL_SANDWICH`) $\rightarrow$ 266 nutrição (2x).
-    - **🔥 Registro & Seletor de Bônus Diários de Produção:**
-      - Seletor persistente no topo da tela e na aba de Culinária com os **13 eventos diários do Albion Online**.
-      - Identificação automática do **Pico de Demanda do Dia**: indica na hora qual comida terá consumo explosivo devido ao evento ativo.
-      - **Destaque Dinâmico no Ranking:** As comidas do dia recebem aura dourada pulsante (`bonus-glow`) e o selo `🔥 BÔNUS HOJE`.
-      - **Filtro de Construções:** Filtra o ranking apenas por comidas usadas em lojas ou por estação específica.
-      - **Envio Rápido de Lotes:** Botões de 1 lote (10 un.) e 10 lotes (100 un.) para abastecer o Planejador com um clique.
+    - **🔥 Registro de 2 Bônus Diários Simultâneos por Item/Linha (47 Atividades):**
+      - Dois seletores persistentes (`1º Bônus` e `2º Bônus`) no topo da tela e na aba de Nutrição, cobrindo individualmente todas as linhas da Árvore do Destino: **Elmos/Armaduras/Botas de Placa, Bestas, Espadas, Machados, Maças, Martelos, Luvas, Escudos, Arcos, Capuzes/Casacos/Sapatos de Couro, Lanças, Adagas, Bordões, Metamorfos, Natureza, Tochas, Hábitos/Robes/Sandálias de Tecido, Cajados Mágicos, Tomos, Ferramentas de Coleta por recurso (Machado, Picareta, Faca, Foice, Martelo, Vara de Pesca), Bolsas, Capas, Refinos (Minério, Madeira, Couro, Fibra, Pedra), Culinária, Poções, Açougueiro, Moinho e Montarias**.
+      - Cada opção exibe diretamente sua **Comida Favorita (2x Nutrição)** e destaca tanto as comidas/lojas na aba Culinária quanto os próprios equipamentos/refinos com o selo `🔥 BÔNUS HOJE` no **Ranking de Lucro**, **Planejador** e **Refino**.
     - **📋 Planejador de Culinária & Lista de Compras Consolidada:**
       - Planejamento de lotes com cálculo de custo, receita esperada, lucro líquido, demanda e foco necessário.
       - Lista de compras consolidada com dedução automática do retorno de recursos da cidade.
