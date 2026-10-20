@@ -225,8 +225,20 @@ class Handler(SimpleHTTPRequestHandler):
                     if city != "Black Market":
                         p = data_offer["price"]
                         amt = data_offer["amount"]
-                        state["qualityPrices"].setdefault(item_id, {}).setdefault(str(q), {})[city] = p
-                        state["qualityAmounts"].setdefault(item_id, {}).setdefault(str(q), {})[city] = amt
+                        q_str = str(q)
+                        # Protecao anti-paginacao: se o leitor ja leu a pagina 1 ha menos de 90s com preco menor,
+                        # evita que clicar na pagina 2/3 ou ordenar por maior preco sobrescreva o menor preco real.
+                        prev_date_str = state.get("dates", {}).get(item_id, {}).get(city, "")
+                        prev_p = state.get("qualityPrices", {}).get(item_id, {}).get(q_str, {}).get(city) or state.get("prices", {}).get(item_id, {}).get(city)
+                        if prev_p and p > prev_p and prev_date_str and "." in str(prev_date_str):
+                            try:
+                                prev_dt = datetime.fromisoformat(str(prev_date_str))
+                                if 0 <= (now_dt - prev_dt).total_seconds() < 90:
+                                    continue
+                            except ValueError:
+                                pass
+                        state["qualityPrices"].setdefault(item_id, {}).setdefault(q_str, {})[city] = p
+                        state["qualityAmounts"].setdefault(item_id, {}).setdefault(q_str, {})[city] = amt
                         if q == 1 or city not in state["prices"].get(item_id, {}):
                             state["prices"].setdefault(item_id, {})[city] = p
                             state["amounts"].setdefault(item_id, {})[city] = amt

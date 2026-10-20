@@ -12,7 +12,7 @@ let histModalState = { itemId: null, loc: 'Black Market' };
 let foodTab = 'rank';
 let foodFilter = {
   family: '', tier: '', ench: '', city: 'Caerleon', focus: false,
-  retRate: 0.248, feeFood: 465, sellLoc: '', sellPricing: 'spot',
+  retRate: 0.248, feeFood: 465, sellLoc: '', sellPricing: 'smart',
   autoArbitrage: true, onlyPriced: true, healthFilter: 'all', sort: 'profitDaily',
   priceSubtab: 'meals', stationUse: ''
 };
@@ -103,6 +103,7 @@ const pct = v => (v === null || v === undefined || isNaN(v)) ? '—' : (v * 100)
 const cls = v => v > 0 ? 'pos' : v < 0 ? 'neg' : '';
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const locName = l => LOC_PT[l] || l;
+const getFoodSaleLocs = () => ((GD && GD.saleLocs) || []).filter(l => l !== 'Black Market');
 function toast(msg, ms = 3500) {
   const t = $('#toast'); t.textContent = msg; t.classList.add('show');
   clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), ms);
@@ -301,9 +302,13 @@ function getVol(id, loc) {
 }
 function getBestVol(id, preferredLoc) {
   if (!ST.volumes || !ST.volumes[id]) return null;
-  if (preferredLoc && ST.volumes[id][preferredLoc]) return { ...ST.volumes[id][preferredLoc], loc: preferredLoc };
+  const isFood = classifyPriceItem(id) === 'food';
+  if (preferredLoc && (!isFood || preferredLoc !== 'Black Market') && ST.volumes[id][preferredLoc]) {
+    return { ...ST.volumes[id][preferredLoc], loc: preferredLoc };
+  }
   let best = null;
   for (const [loc, data] of Object.entries(ST.volumes[id])) {
+    if (isFood && loc === 'Black Market') continue;
     if (!best || (data.daily || 0) > (best.daily || 0)) {
       best = { ...data, loc };
     }
@@ -395,21 +400,34 @@ function calcVolumeSummary(pts) {
     validPts.push({ ts: ptTs, date: pt.timestamp.slice(0, 10), count, avg: Math.round(avg) });
   }
   validPts.sort((a, b) => a.ts - b.ts);
+  const recentRawPrices = validPts
+    .filter(pt => (now - pt.ts) / (1000 * 3600 * 24) <= 28)
+    .map(pt => pt.avg)
+    .sort((a, b) => a - b);
+  const rawMed28 = recentRawPrices.length > 0
+    ? (recentRawPrices.length % 2 !== 0
+      ? recentRawPrices[Math.floor(recentRawPrices.length / 2)]
+      : Math.round((recentRawPrices[recentRawPrices.length / 2 - 1] + recentRawPrices[recentRawPrices.length / 2]) / 2))
+    : null;
+
   const series28 = [];
   const prices28 = [];
   for (const pt of validPts) {
     const diffDays = (now - pt.ts) / (1000 * 3600 * 24);
+    // Protege o VWAP contra dias isolados com venda troll/RMT (ex: 1 un. vendida a 10x a mediana)
+    const isSpikeDay = rawMed28 && recentRawPrices.length >= 3 && pt.avg > rawMed28 * 2.5;
+    const safeAvg = isSpikeDay ? Math.round(rawMed28 * 1.35) : pt.avg;
     if (diffDays <= 28) {
       total28 += pt.count;
-      silver28 += pt.count * pt.avg;
-      if (pt.avg < minPrice) minPrice = pt.avg;
-      if (pt.avg > maxPrice) maxPrice = pt.avg;
-      prices28.push(pt.avg);
-      series28.push({ date: pt.date, count: pt.count, avg: pt.avg });
+      silver28 += pt.count * safeAvg;
+      if (safeAvg < minPrice) minPrice = safeAvg;
+      if (safeAvg > maxPrice) maxPrice = safeAvg;
+      prices28.push(safeAvg);
+      series28.push({ date: pt.date, count: pt.count, avg: safeAvg });
     }
     if (diffDays <= 7) {
       total7 += pt.count;
-      silver7 += pt.count * pt.avg;
+      silver7 += pt.count * safeAvg;
     }
     if (pt.ts > latestTs) { latestTs = pt.ts; lastDate = pt.date; }
   }
@@ -456,7 +474,7 @@ function calcVolumeSummary(pts) {
   };
 }
 
-function analyzePriceHealth(spotPrice, vol) {
+function analyzePriceHealth(spotPrice, vol, refPrice = null) {
   if (!spotPrice || spotPrice <= 0) {
     return {
       status: 'none',
@@ -470,6 +488,18 @@ function analyzePriceHealth(spotPrice, vol) {
     };
   }
   if (!vol || (!vol.vwap && !vol.daily && !vol.total28)) {
+    if (refPrice && refPrice > 0 && spotPrice >= refPrice * 1.45) {
+      const diffPct = Math.round(((spotPrice - refPrice) / refPrice) * 100);
+      return {
+        status: 'inflated',
+        label: `Anormal (+${diffPct}%)`,
+        badgeClass: 'health-inflated',
+        icon: '⚠️',
+        title: `Preço Anormalmente Alto (+${diffPct}% vs Referência ${fmt(refPrice)}s)`,
+        diffPct, vwap: refPrice, daily: 0, daysSince: 999,
+        desc: `A oferta spot (${fmt(spotPrice)}s) está +${diffPct}% acima da referência de mercado/custo (${fmt(refPrice)}s), indicando anúncio isolado ou leitura da última página do mercado.`
+      };
+    }
     return {
       status: 'nodata',
       label: 'Sem histórico',
@@ -482,7 +512,8 @@ function analyzePriceHealth(spotPrice, vol) {
     };
   }
 
-  const vwap = vol.vwap || vol.vwap28 || vol.vwap7 || 0;
+  const rawVwap = vol.vwap || vol.vwap28 || vol.vwap7 || 0;
+  const vwap = (refPrice && refPrice > 0 && rawVwap > refPrice * 2.2) ? refPrice : (rawVwap || refPrice || 0);
   const daily = vol.daily !== undefined ? vol.daily : 0;
   const daysSince = vol.daysSinceLast !== undefined ? vol.daysSinceLast : 999;
 
@@ -557,8 +588,8 @@ function analyzePriceHealth(spotPrice, vol) {
   };
 }
 
-function priceHealthBadge(spotPrice, vol, itemId = '', loc = '') {
-  const h = analyzePriceHealth(spotPrice, vol);
+function priceHealthBadge(spotPrice, vol, itemId = '', loc = '', refPrice = null) {
+  const h = analyzePriceHealth(spotPrice, vol, refPrice);
   const dataAttrs = itemId ? `data-hist-id="${esc(itemId)}" data-hist-loc="${esc(loc)}"` : '';
   return `<span class="health-pill ${h.badgeClass}" ${dataAttrs} title="${esc(h.title + ' — Clique para ver o gráfico e histórico completo')}">${h.icon} ${h.label}</span>`;
 }
@@ -1034,15 +1065,80 @@ function updateFoodReturnRate() {
   }
 }
 
+function getFoodReferenceStats(itemId, unitCost = null) {
+  const locs = getFoodSaleLocs();
+  const citySpots = [];
+  for (const c of locs) {
+    const p = getP(itemId, c);
+    if (p && p > 0) citySpots.push(p);
+  }
+  citySpots.sort((a, b) => a - b);
+  const lowMedCity = citySpots.length > 0 ? citySpots[Math.floor((citySpots.length - 1) / 2)] : null;
+
+  const vwaps = [];
+  const vMap = (ST.volumes && ST.volumes[itemId]) || {};
+  for (const c of locs) {
+    const d = vMap[c];
+    if (d && d.vwap > 0 && (d.daily || 0) >= 0.2) vwaps.push(d.vwap);
+  }
+  vwaps.sort((a, b) => a - b);
+  const medVwap = vwaps.length > 0 ? vwaps[Math.floor((vwaps.length - 1) / 2)] : null;
+
+  // Define âncora confiável combinando mediana das cidades, VWAP e custo de produção
+  let anchorPrice = null;
+  if (lowMedCity && medVwap) {
+    anchorPrice = Math.min(lowMedCity, Math.max(medVwap * 1.25, unitCost || 0));
+  } else if (medVwap) {
+    anchorPrice = Math.max(medVwap, (unitCost || 0) * 0.9);
+  } else if (lowMedCity) {
+    anchorPrice = lowMedCity;
+  }
+  if (unitCost && unitCost > 0) {
+    const isEnch = itemId.includes('@');
+    const costCapMult = isEnch ? 2.6 : 2.1;
+    if (!anchorPrice || anchorPrice > unitCost * costCapMult) {
+      anchorPrice = Math.round(unitCost * (isEnch ? 1.35 : 1.25));
+    }
+  }
+
+  let maxSaneSpot = Infinity;
+  const baseForMax = Math.max(anchorPrice || 0, unitCost || 0);
+  if (baseForMax > 0) {
+    const isEnch = itemId.includes('@');
+    maxSaneSpot = Math.round(baseForMax * (isEnch ? 2.15 : 1.95));
+    if (lowMedCity && citySpots.length >= 2) {
+      maxSaneSpot = Math.min(maxSaneSpot, Math.round(lowMedCity * 2.1));
+    }
+    if (unitCost && unitCost > 0) {
+      maxSaneSpot = Math.max(maxSaneSpot, Math.round(unitCost * (isEnch ? 2.4 : 1.85)));
+    }
+  }
+
+  return { lowMedCity, medVwap, anchorPrice, maxSaneSpot, cityCount: citySpots.length };
+}
+
 function getFoodIngredientBuy(id, reqQty = 1, options = {}) {
   const allowAllCities = options.allowAllCities !== false;
   const preferLoc = options.preferLoc || foodFilter.city || 'Caerleon';
   const autoArbitrage = options.autoArbitrage !== false && (foodFilter.autoArbitrage !== false);
   const taxBuy = ST.config.taxBuy || 0;
 
-  // 1. Compra Direta de Mercado
-  const searchCities = allowAllCities ? [...GD.cities, 'Caerleon'] : [preferLoc];
-  const spot = minBuy(id, searchCities);
+  // 1. Compra Direta de Mercado (filtrando outliers de cidades contaminadas na API)
+  const allCities = getFoodSaleLocs();
+  const refStats = getFoodReferenceStats(id, null);
+  const searchCities = allowAllCities ? allCities : [preferLoc];
+
+  let spot = null;
+  for (const c of searchCities) {
+    const v = getP(id, c);
+    if (!v || v <= 0) continue;
+    // Ignora cidade se o preço do insumo estiver absurdo (>2.5x a mediana das cidades)
+    if (refStats.lowMedCity && v > refStats.lowMedCity * 2.5 && allCities.length > 1) continue;
+    if (!spot || v < spot.price) spot = { price: v, loc: c };
+  }
+  if (!spot && !allowAllCities) {
+    spot = minBuy(id, allCities);
+  }
   const vol = spot ? (getVol(id, spot.loc) || getBestVol(id)) : null;
   const vwap = (vol && vol.vwap > 0) ? vol.vwap : null;
   const mode = ST.config.materialPricing || 'smart';
@@ -1216,27 +1312,71 @@ function computeMealItem(foodId, enchLevel = 0, options = {}) {
   const batchCost = hasMissingIng ? null : (batchIngCost + sauceCost + batchStationFee);
   const unitCost = batchCost !== null ? (batchCost / amountCrafted) : null;
 
-  // Venda e liquidez
-  let bestSell = null;
-  const searchSaleLocs = filterSellLoc ? [filterSellLoc] : GD.saleLocs;
+  // Venda e liquidez (com filtro anti-outlier e anti-inflação)
+  const searchSaleLocs = filterSellLoc ? [filterSellLoc] : getFoodSaleLocs();
+  const refStats = getFoodReferenceStats(fullItemId, unitCost);
+  const refPrice = refStats.anchorPrice;
+
+  const candidates = [];
   for (const loc of searchSaleLocs) {
-    const p = getP(fullItemId, loc);
-    if (p && (!bestSell || p > bestSell.price)) {
-      bestSell = { price: p, loc };
+    const rawP = getP(fullItemId, loc);
+    if (!rawP || rawP <= 0) continue;
+    const locVol = getVol(fullItemId, loc);
+    const rawLocVwap = (locVol && locVol.vwap > 0) ? locVol.vwap : null;
+    const safeLocVwap = (rawLocVwap && refStats.maxSaneSpot < Infinity && rawLocVwap > refStats.maxSaneSpot * 1.2)
+      ? refPrice
+      : rawLocVwap;
+    const locHealth = analyzePriceHealth(rawP, locVol, refPrice);
+    const isExtremeOutlier = (refStats.maxSaneSpot < Infinity && rawP > refStats.maxSaneSpot)
+      || (safeLocVwap && rawP > safeLocVwap * 1.75)
+      || (refStats.lowMedCity && refStats.cityCount >= 2 && rawP > refStats.lowMedCity * 2.1);
+
+    let effP = rawP;
+    if (sellPricingMode === 'vwap') {
+      effP = safeLocVwap || (isExtremeOutlier ? refPrice : rawP);
+    } else if (sellPricingMode === 'safe') {
+      const cap = safeLocVwap || refPrice || rawP;
+      effP = Math.min(rawP, cap);
+    } else if (sellPricingMode === 'smart') {
+      if (isExtremeOutlier || locHealth.status === 'inflated') {
+        effP = safeLocVwap || refPrice || rawP;
+        if (refStats.maxSaneSpot < Infinity && effP > refStats.maxSaneSpot) {
+          effP = refPrice || Math.round(refStats.maxSaneSpot * 0.85);
+        }
+      }
+    } else if (sellPricingMode === 'spot') {
+      // Mesmo no modo Spot, descarta anomalias extremas da API (>2.2x mediana/teto, como ordens de 9.9M ou última página)
+      if (isExtremeOutlier && (rawP > (refPrice || 1) * 2.2 || rawP > refStats.maxSaneSpot * 1.15)) {
+        effP = safeLocVwap || refPrice || rawP;
+      }
+    }
+
+    candidates.push({
+      loc,
+      rawSpot: rawP,
+      effPrice: effP ? Math.round(effP) : null,
+      vol: locVol,
+      health: locHealth,
+      isOutlier: isExtremeOutlier
+    });
+  }
+
+  // Prioriza cidades com cotação legítima (não-outlier); só usa cidade outlier se for a única opção (e já com preço corrigido)
+  const cleanCandidates = candidates.filter(c => !c.isOutlier && c.effPrice > 0);
+  const pool = cleanCandidates.length > 0 ? cleanCandidates : candidates.filter(c => c.effPrice > 0);
+  let bestSell = null;
+  for (const c of pool) {
+    if (!bestSell || c.effPrice > bestSell.effPrice) {
+      bestSell = c;
     }
   }
 
-  const spotPrice = bestSell ? bestSell.price : null;
+  const spotPrice = bestSell ? bestSell.rawSpot : null;
+  const effectiveSellPrice = bestSell ? bestSell.effPrice : null;
   const sellLoc = bestSell ? bestSell.loc : (filterSellLoc || '—');
-  const vol = spotPrice ? (getVol(fullItemId, sellLoc) || getBestVol(fullItemId)) : null;
-  const health = analyzePriceHealth(spotPrice, vol);
-
-  let effectiveSellPrice = spotPrice;
-  if (vol && vol.vwap > 0) {
-    if (sellPricingMode === 'vwap') effectiveSellPrice = vol.vwap;
-    else if (sellPricingMode === 'safe') effectiveSellPrice = spotPrice ? Math.min(spotPrice, vol.vwap) : vol.vwap;
-    else if (sellPricingMode === 'smart' && health.status === 'inflated') effectiveSellPrice = vol.vwap;
-  }
+  const vol = bestSell ? (bestSell.vol || getBestVol(fullItemId)) : null;
+  const health = analyzePriceHealth(effectiveSellPrice || spotPrice, vol, refPrice);
+  const wasPriceCapped = !!(spotPrice && effectiveSellPrice && spotPrice > effectiveSellPrice * 1.05);
 
   const revenue = effectiveSellPrice ? effectiveSellPrice * (1 - taxSell) : null;
   const profit = (unitCost !== null && revenue !== null) ? revenue - unitCost : null;
@@ -1269,6 +1409,8 @@ function computeMealItem(foodId, enchLevel = 0, options = {}) {
     hasMissingIng,
     spotPrice,
     effectiveSellPrice,
+    wasPriceCapped,
+    refPrice,
     sellLoc,
     vol,
     dailyVol,
@@ -2008,15 +2150,15 @@ function viewFoodRank() {
       <label>Venda:
         <select data-ff="sellLoc">
           <option value="">Melhor Cidade</option>
-          ${GD.saleLocs.map(l => `<option value="${l}"${f.sellLoc === l ? ' selected' : ''}>${locName(l)}</option>`).join('')}
+          ${getFoodSaleLocs().map(l => `<option value="${l}"${f.sellLoc === l ? ' selected' : ''}>${locName(l)}</option>`).join('')}
         </select>
       </label>
       <label>Precificação:
         <select data-ff="sellPricing">
-          <option value="spot"${f.sellPricing === 'spot' ? ' selected' : ''}>Preço Spot</option>
-          <option value="smart"${f.sellPricing === 'smart' ? ' selected' : ''}>Inteligente (Anti-inflado)</option>
+          <option value="smart"${f.sellPricing === 'smart' ? ' selected' : ''}>🛡️ Inteligente (Anti-inflado)</option>
           <option value="safe"${f.sellPricing === 'safe' ? ' selected' : ''}>Seguro (Min Spot/VWAP)</option>
           <option value="vwap"${f.sellPricing === 'vwap' ? ' selected' : ''}>VWAP (Média 7d)</option>
+          <option value="spot"${f.sellPricing === 'spot' ? ' selected' : ''}>Preço Spot</option>
         </select>
       </label>
       <label>Ordenar por:
@@ -2089,12 +2231,12 @@ function viewFoodRank() {
                 <td>${sauceChip}</td>
                 <td><b>${fmt(m.unitCost)}</b>s</td>
                 <td>
-                  ${m.spotPrice ? `<b>${fmt(m.spotPrice)}</b>s <span class="muted">(${locName(m.sellLoc)})</span>` : '<span class="muted">—</span>'}
+                  ${m.effectiveSellPrice ? `<b>${fmt(m.effectiveSellPrice)}</b>s <span class="muted">(${locName(m.sellLoc)})</span>${m.wasPriceCapped ? `<div class="muted" style="font-size:10px;color:#f0c04b" title="O preço spot bruto em ${locName(m.sellLoc)} (${fmt(m.spotPrice)}s) estava inflado/outlier e foi ajustado para a referência real (${fmt(m.effectiveSellPrice)}s)">🛡️ Spot inflado: ${fmt(m.spotPrice)}s</div>` : ''}` : '<span class="muted">—</span>'}
                 </td>
                 <td>
                   <div style="display:inline-flex;gap:4px;align-items:center">
                     ${volBadge(m.vol, m.sellLoc, m.id, m.sellLoc)}
-                    ${priceHealthBadge(m.spotPrice, m.vol, m.id, m.sellLoc)}
+                    ${priceHealthBadge(m.effectiveSellPrice || m.spotPrice, m.vol, m.id, m.sellLoc, m.refPrice)}
                   </div>
                 </td>
                 <td class="${cls(m.profit)}">${fmt(m.profit)}s</td>
@@ -2134,7 +2276,7 @@ function viewFoodNutrition() {
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px;margin-top:6px">
           <div>Custo Craft: <b>${fmt(meal.unitCost)}s</b></div>
-          <div>Venda Spot: <b>${fmt(meal.spotPrice)}s</b></div>
+          <div>Venda Real: <b>${fmt(meal.effectiveSellPrice)}s</b></div>
           <div class="${cls(meal.profit)}">Lucro/un: <b>${fmt(meal.profit)}s</b></div>
           <div>Giro Diário: <b>${fmt(meal.dailyVol)} un/dia</b></div>
         </div>
@@ -2230,7 +2372,7 @@ function viewFoodNutrition() {
                   <td><span class="nutri-pill x2">+100% (${fmt(st.bonusNutrition)})</span></td>
                   <td class="l" style="max-width:260px;white-space:normal;font-size:12px">${esc(st.craftedItems)}</td>
                   <td>${meal && meal.unitCost !== null ? `<b>${fmt(meal.unitCost)}</b>s` : '<span class="muted">—</span>'}</td>
-                  <td>${meal && meal.spotPrice ? `<b>${fmt(meal.spotPrice)}</b>s <span class="muted">(${locName(meal.sellLoc)})</span>` : '<span class="muted">—</span>'}</td>
+                  <td>${meal && meal.effectiveSellPrice ? `<b>${fmt(meal.effectiveSellPrice)}</b>s <span class="muted">(${locName(meal.sellLoc)})</span>` : '<span class="muted">—</span>'}</td>
                   <td class="${meal ? cls(meal.profit) : ''}">${meal && meal.profit !== null ? fmt(meal.profit) + 's' : '—'}</td>
                   <td>${meal ? volBadge(meal.vol, meal.sellLoc, meal.id, meal.sellLoc) : '—'}</td>
                   <td>
@@ -2440,7 +2582,7 @@ function viewFoodPlan() {
                   <td><b>${fmt(r.totalUnits)}</b> un.</td>
                   <td>${fmt(it.unitCost)}s</td>
                   <td>${fmt(r.totalCost)}s</td>
-                  <td>${it.spotPrice ? `<b>${fmt(it.spotPrice)}</b>s <span class="muted">(${locName(it.sellLoc)})</span>` : '—'}</td>
+                  <td>${it.effectiveSellPrice ? `<b>${fmt(it.effectiveSellPrice)}</b>s <span class="muted">(${locName(it.sellLoc)})</span>` : '—'}</td>
                   <td class="${cls(it.profit)}">${fmt(it.profit)}s</td>
                   <td class="${cls(r.totalProfit)}"><b>${fmt(r.totalProfit)}</b>s</td>
                   <td>
@@ -2540,7 +2682,7 @@ function viewFoodPrices() {
         <button id="fetchFoodVolumes" class="ghost" style="font-size:12px;padding:6px 12px">📊 Buscar Histórico & VWAP</button>
       </div>
     </div>
-    ${priceTable(itemsToShow, GD.saleLocs)}
+    ${priceTable(itemsToShow, getFoodSaleLocs())}
   `;
 }
 
@@ -3072,13 +3214,13 @@ async function fetchPrices(ids, opts = {}) {
     jobs.push({ ch, locs: GD.cities.join(','), qualities: '1', label: 'Materiais/Artefatos' });
   }
   for (const ch of chunkIds(foodItemIds, 2200)) {
-    jobs.push({ ch, locs: GD.saleLocs.join(','), qualities: '1', label: 'Culinária' });
+    jobs.push({ ch, locs: getFoodSaleLocs().join(','), qualities: '1', label: 'Culinária' });
   }
   for (const ch of chunkIds(equipIds, 1450)) {
     jobs.push({ ch, locs: GD.saleLocs.join(','), qualities: '1,2,3,4,5', label: 'Equipamentos Q1-Q5' });
   }
 
-  let got = 0, done = 0;
+  let got = 0, done = 0, rejectedOutliers = 0;
   try {
     for (let i = 0; i < jobs.length; i++) {
       if (CANCEL_FETCH) break;
@@ -3093,14 +3235,100 @@ async function fetchPrices(ids, opts = {}) {
       const nowTs = Date.now();
       for (const id of job.ch) ST.priceFetchedAt[id] = nowTs;
 
+      // Pré-calcula mediana por item no lote para filtrar preços absurdos/contaminados da API (ex: última página ou ordens 9.99M)
+      const batchItemStats = {};
+      for (const e of data) {
+        if (!e || !e.item_id || e.city === 'Black Market') continue;
+        const p = e.sell_price_min || 0;
+        if (p > 0) {
+          (batchItemStats[e.item_id] = batchItemStats[e.item_id] || []).push(p);
+        }
+      }
+      const batchRefMap = {};
+      const estMealCost = id => {
+        if (!id || !id.includes('_MEAL_') || !GD || !GD.foods) return null;
+        const [baseId, enchStr] = id.split('@');
+        const ench = enchStr ? Number(enchStr) : 0;
+        const f = GD.foods.find(x => x.id === baseId);
+        if (!f) return null;
+        const ingCnt = (f.ingredients || []).reduce((s, x) => s + (x.count || 0), 0);
+        const baseCost = (ingCnt * 410 * (1 - 0.248) + (f.batchIv || 400) * 0.1125 * 4.65) / 10;
+        if (!ench) return Math.round(baseCost);
+        const ed = (f.enchantments || []).find(x => x.level === ench);
+        const sauceUnit = ench === 1 ? 4700 : ench === 2 ? 14800 : 42000;
+        return Math.round(baseCost + ((ed ? ed.sauceCount : 10) * sauceUnit) / 10);
+      };
+      for (const [id, arr] of Object.entries(batchItemStats)) {
+        arr.sort((a, b) => a - b);
+        const lowMed = arr[Math.floor((arr.length - 1) / 2)];
+        const vMap = (ST.volumes && ST.volumes[id]) || {};
+        const vwaps = Object.entries(vMap)
+          .filter(([c, d]) => c !== 'Black Market' && d && d.vwap > 0 && (d.daily || 0) >= 0.2)
+          .map(([, d]) => d.vwap)
+          .sort((a, b) => a - b);
+        const medVwap = vwaps.length > 0 ? vwaps[Math.floor((vwaps.length - 1) / 2)] : null;
+        const estCost = estMealCost(id);
+        const rawAnchor = (lowMed && medVwap) ? Math.min(lowMed, medVwap * 1.25) : (medVwap || lowMed);
+        const anchor = estCost ? Math.max(rawAnchor || 0, estCost) : rawAnchor;
+        batchRefMap[id] = {
+          lowMed,
+          medVwap,
+          estCost,
+          anchor,
+          count: arr.length
+        };
+      }
+
       for (const e of data) {
         const kind = classifyPriceItem(e.item_id);
         const loc = e.city;
         if (!GD.saleLocs.includes(loc)) continue;
         if (kind === 'material' && !GD.cities.includes(loc)) continue;
+        if (kind === 'food' && loc === 'Black Market') continue;
         let price = e.sell_price_min, date = e.sell_price_min_date;
         if (loc === 'Black Market') { price = e.buy_price_max; date = e.buy_price_max_date; }
         const q = String(e.quality || 1);
+
+        if (kind === 'food' || kind === 'material') {
+          const bStat = batchRefMap[e.item_id];
+          const anchor = bStat ? bStat.anchor : null;
+          const lowMed = bStat ? bStat.lowMed : null;
+          const estCost = bStat ? bStat.estCost : null;
+          const isSingleOrderPage = (e.sell_price_min > 0 && e.sell_price_min === e.sell_price_max);
+          const isBasicIng = /^(T\d+_(CARROT|BEAN|WHEAT|TURNIP|CABBAGE|POTATO|CORN|PUMPKIN|EGG|MILK|MEAT|FLOUR|BREAD|BUTTER))$/.test(e.item_id);
+          const isSauce3 = e.item_id === 'T1_FISHSAUCE_LEVEL3';
+
+          if (price > 0) {
+            let isOutlier = false;
+            if (isBasicIng) {
+              isOutlier = price > 2500;
+            } else if (isSauce3) {
+              isOutlier = price > 140000;
+            } else {
+              isOutlier = !!(
+                (anchor && bStat.count >= 2 && price > anchor * 1.95 && price > (lowMed || anchor) * 1.85)
+                || (anchor && isSingleOrderPage && price > anchor * 1.65)
+                || (estCost && price > estCost * 2.5)
+              );
+            }
+
+            if (isOutlier) {
+              rejectedOutliers++;
+              // Se havia valor contaminado salvo nessa cidade, remove
+              if (ST.prices[e.item_id] && ST.prices[e.item_id][loc] && anchor && ST.prices[e.item_id][loc] > anchor * 1.75) {
+                delete ST.prices[e.item_id][loc];
+                if (ST.qualityPrices?.[e.item_id]?.[q]) delete ST.qualityPrices[e.item_id][q][loc];
+              }
+              continue;
+            }
+          } else if (price === 0 && anchor && ST.prices[e.item_id] && ST.prices[e.item_id][loc] > anchor * 1.75) {
+            // Limpa preço fantasma antigo caso a API retorne 0 para a cidade
+            delete ST.prices[e.item_id][loc];
+            if (ST.qualityPrices?.[e.item_id]?.[q]) delete ST.qualityPrices[e.item_id][q][loc];
+            continue;
+          }
+        }
+
         if (price > 0) {
           ST.qualityPrices = ST.qualityPrices || {};
           ST.qualityPrices[e.item_id] = ST.qualityPrices[e.item_id] || {};
@@ -3126,10 +3354,11 @@ async function fetchPrices(ids, opts = {}) {
       save();
       if (i < jobs.length - 1 && !CANCEL_FETCH) await sleep(1650);
     }
+    const outlierMsg = rejectedOutliers > 0 ? ` · 🛡️ ${rejectedOutliers} preço(s) inflado(s)/troll descartado(s)` : '';
     if (CANCEL_FETCH) {
-      toast(`⏹ Busca pausada pelo usuário: ${got} cotações salvas (${done}/${list.length} itens processados). Clique novamente quando quiser continuar de onde parou!`, 6000);
+      toast(`⏹ Busca pausada pelo usuário: ${got} cotações salvas (${done}/${list.length} itens processados)${outlierMsg}.`, 6000);
     } else {
-      toast(`✓ ${got} preços atualizados (${done} itens consultados${skippedCount ? `, ${skippedCount} recentes mantidos` : ''}).`, 5000);
+      toast(`✓ ${got} preços atualizados (${done} itens consultados${skippedCount ? `, ${skippedCount} recentes mantidos` : ''})${outlierMsg}.`, 5500);
     }
   } catch (err) {
     toast(`⚠️ ${err.message} (${got} preços obtidos em ${done}/${list.length} itens foram salvos; clique novamente para continuar de onde parou!).`, 9000);
@@ -3274,6 +3503,7 @@ async function fetchVolumes(ids, opts = {}) {
         for (const entry of data) {
           const itemId = entry.item_id;
           const loc = entry.location;
+          if (classifyPriceItem(itemId) === 'food' && loc === 'Black Market') continue;
           const summary = calcVolumeSummary(entry.data);
           if (summary) {
             ST.volumes[itemId] = ST.volumes[itemId] || {};
@@ -3657,15 +3887,27 @@ function bind() {
       } else if (d.ff === 'city') {
         foodFilter.city = el.value;
         updateFoodReturnRate();
+        ST.foodConfig = { ...ST.foodConfig, city: foodFilter.city, retRate: foodFilter.retRate };
+        save();
       } else if (d.ff === 'focus') {
         foodFilter.focus = el.checked;
         updateFoodReturnRate();
+        ST.foodConfig = { ...ST.foodConfig, focus: foodFilter.focus, retRate: foodFilter.retRate };
+        save();
       } else if (d.ff === 'retRate') {
         foodFilter.retRate = Number(el.value) / 100;
+        ST.foodConfig = { ...ST.foodConfig, retRate: foodFilter.retRate };
+        save();
       } else if (d.ff === 'feeFood') {
         foodFilter.feeFood = Number(el.value) || 0;
+        ST.foodConfig = { ...ST.foodConfig, feeFood: foodFilter.feeFood };
+        save();
       } else {
         foodFilter[d.ff] = el.type === 'checkbox' ? el.checked : el.value;
+        if (d.ff === 'sellPricing' || d.ff === 'autoArbitrage') {
+          ST.foodConfig = { ...ST.foodConfig, [d.ff]: foodFilter[d.ff] };
+          save();
+        }
       }
       return render();
     }
@@ -3760,7 +4002,7 @@ function bind() {
       ST.volFetchedAt = {};
       fetch('/api/clear_cache').catch(() => {});
       save();
-      toast('? Registro de coleta recente resetado! Agora a busca consultar� todos os itens do zero com Brecilien.');
+      toast('? Registro de coleta recente resetado! Agora a busca consultará todos os itens do zero com Brecilien.');
       return render();
     }
     if (t.id === 'exportBtn') {
@@ -3891,6 +4133,7 @@ async function checkLiveStatus() {
     retRate: 0.248,
     feeFood: 465,
     autoArbitrage: true,
+    sellPricing: 'smart',
     ...ST.foodConfig
   };
   foodFilter.city = ST.foodConfig.city || 'Caerleon';
@@ -3898,6 +4141,7 @@ async function checkLiveStatus() {
   foodFilter.retRate = ST.foodConfig.retRate !== undefined ? ST.foodConfig.retRate : 0.248;
   foodFilter.feeFood = ST.foodConfig.feeFood || 465;
   foodFilter.autoArbitrage = ST.foodConfig.autoArbitrage !== false;
+  foodFilter.sellPricing = ST.foodConfig.sellPricing || 'smart';
   ST.config = {
     taxBuy: 0, taxSell: 0.065, retRefine: 0.367, retCraft: 0.248, feeRefine: 465, feeCraft: 465,
     server: 'west', materialPricing: 'smart', targetQuality: 'mix', fetchFreshness: 'smart_60',
