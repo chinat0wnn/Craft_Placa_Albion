@@ -3755,6 +3755,14 @@ function bind() {
     if (t.id === 'fetchBarVolumes') return fetchVolumes(barIds());
     if (t.id === 'fetchWoodVolumes') return fetchVolumes(woodIds());
     if (t.id === 'fetchPlankVolumes') return fetchVolumes(plankIds());
+    if (t.id === 'resetFetchTimestampsBtn') {
+      ST.priceFetchedAt = {};
+      ST.volFetchedAt = {};
+      fetch('/api/clear_cache').catch(() => {});
+      save();
+      toast('? Registro de coleta recente resetado! Agora a busca consultará todos os itens do zero com Brecilien.');
+      return render();
+    }
     if (t.id === 'exportBtn') {
       const a = document.createElement('a');
       a.href = URL.createObjectURL(new Blob([JSON.stringify(ST, null, 1)], { type: 'application/json' }));

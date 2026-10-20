@@ -119,6 +119,10 @@ class Handler(SimpleHTTPRequestHandler):
                 res["last_heartbeat"] = live_status["last_heartbeat"].isoformat() if live_status["last_heartbeat"] else None
                 res["last_update"] = live_status["last_update"].isoformat() if live_status["last_update"] else None
                 return self._json(res)
+        if url.path == "/api/clear_cache":
+            with lock:
+                api_cache.clear()
+            return self._json({"ok": True, "msg": "Cache limpo"})
         if url.path == "/api/prices":
             q = urllib.parse.parse_qs(url.query)
             host = API_HOSTS.get(q.get("server", ["west"])[0], "west")
