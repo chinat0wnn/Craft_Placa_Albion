@@ -105,7 +105,7 @@ Sistema integrado de **Refino de Minérios e Madeiras**, **Craft de Equipamentos
     - **Bônus de Produção de Culinária:**
       - **Caerleon (Cidade Bônus Oficial):** 24.8% de retorno sem foco, ~47.9% com foco.
       - **Ilha Particular:** 0% de retorno sem foco, ~43.5% com foco.
-      - Cidades Reais: 15.2% de retorno sem foco.
+      - Cidades Reais & Brecilien: 15.2% de retorno sem foco.
     - **Encantamentos (.1, .2, .3) com Molhos de Peixe:**
       - Aplicação de **Molho de Peixe Básico (.1)**, **Extravagante (.2)** e **Especial (.3)** com as quantidades exatas por tier (10, 30 ou 90 molhos por lote de 10).
       - Conforme as regras oficiais do jogo, molhos de peixe têm **0% de taxa de retorno** (sem desperdício de cálculo).

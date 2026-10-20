@@ -1992,6 +1992,7 @@ function viewFoodRank() {
           <option value="Bridgewatch"${f.city === 'Bridgewatch' ? ' selected' : ''}>Bridgewatch (15.2%)</option>
           <option value="Lymhurst"${f.city === 'Lymhurst' ? ' selected' : ''}>Lymhurst (15.2%)</option>
           <option value="Fort Sterling"${f.city === 'Fort Sterling' ? ' selected' : ''}>Fort Sterling (15.2%)</option>
+          <option value="Brecilien"${f.city === 'Brecilien' ? ' selected' : ''}>Brecilien (15.2%)</option>
         </select>
       </label>
       <label style="display:flex;align-items:center;gap:6px;cursor:pointer;flex-direction:row;margin-top:14px">

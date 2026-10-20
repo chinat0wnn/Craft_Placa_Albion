@@ -56,6 +56,7 @@ LOCATIONS = {
     3005: "Caerleon",
     3013: "Caerleon",
     3003: "Black Market",
+    5000: "Brecilien",
     5003: "Brecilien"
 }
 
@@ -65,6 +66,8 @@ def resolve_location(loc_raw):
     s = str(loc_raw).strip()
     if "Auction2" in s or "BlackMarket" in s or s == "3003":
         return "Black Market"
+    if "Brecilien" in s or s in ("5000", "5003"):
+        return "Brecilien"
     digits = "".join(filter(str.isdigit, s))
     if digits:
         return LOCATIONS.get(int(digits))

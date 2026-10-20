@@ -43,7 +43,8 @@ PIECES = [
     ("BOW", "Arco", 0, 32, "bow"),
     ("CROSSBOW", "Besta", 12, 20, "crossbow"),
 ]
-CITIES = ["Thetford", "Martlock", "Bridgewatch", "Lymhurst", "Fort Sterling"]
+CITIES = ["Thetford", "Martlock", "Bridgewatch", "Lymhurst", "Fort Sterling", "Brecilien"]
+ROYAL_CITIES = ["Thetford", "Martlock", "Bridgewatch", "Lymhurst", "Fort Sterling"]
 
 ROYAL_SIGILS = {
     4: {"id": "QUESTITEM_TOKEN_ROYAL_T4", "name": "Emblema Real do Adepto (T4)", "tier": 4},
@@ -230,7 +231,7 @@ if not os.path.exists(data_path):
                 t, e = (int(x) for x in f"{float(a):.1f}".split("."))
             except (TypeError, ValueError):
                 continue
-            vals = {CITIES[j]: ws.cell(r, 2 + j).value for j in range(5)}
+            vals = {ROYAL_CITIES[j]: ws.cell(r, 2 + j).value for j in range(5)}
             vals = {k: v for k, v in vals.items() if isinstance(v, (int, float)) and v > 0}
             if vals:
                 prices[(ore_id if r <= 34 else bar_id)(t, e)] = vals
