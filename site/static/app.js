@@ -16,6 +16,25 @@ let foodFilter = {
   autoArbitrage: true, onlyPriced: true, healthFilter: 'all', sort: 'profitDaily',
   priceSubtab: 'meals', stationUse: ''
 };
+let recommendFilter = {
+  cat: '',
+  slot: 'SHOES',
+  variantType: 'all',
+  variant: '',
+  tmin: 4,
+  tmax: 7,
+  ench0: true,
+  ench1: true,
+  ench2: true,
+  ench3: false,
+  targetPieces: 50,
+  horizon: 'fast',
+  minMargin: 0.10,
+  prioritizeBonus: true,
+  safeOnly: true,
+  variety: 'balanced'
+};
+let activeRecommendation = null;
 
 function getDailyBonusBySlot(slotNum = 1) {
   const key = slotNum === 2 ? 'activeDailyBonus2' : 'activeDailyBonus';
@@ -762,7 +781,7 @@ function computeBaseItem(bars, code, slot, k, targetQ = null, planks = null, sel
   const qMode = targetQ || rankFilter.quality || ST.config.targetQuality || 'mix';
   const sell = bestSellQuality(itId, qMode);
   const spotPrice = sell ? sell.price : null;
-  const vol = sell ? getVol(itId, sell.loc) : getBestVol(itId);
+  const vol = sell ? (getVol(itId, sell.loc) || getBestVol(itId)) : getBestVol(itId);
   const health = analyzePriceHealth(spotPrice, vol);
   const sellPricingMode = sellMode || rankFilter.sellPricing || 'spot';
 
@@ -834,7 +853,7 @@ function computeItem(bars, code, slot, k, targetQ = null, planks = null, sellMod
     const itId = itemId(code, slot, k);
     const sell = bestSellQuality(itId, qMode);
     const spotPrice = sell ? sell.price : null;
-    const vol = sell ? getVol(itId, sell.loc) : getBestVol(itId);
+    const vol = sell ? (getVol(itId, sell.loc) || getBestVol(itId)) : getBestVol(itId);
     const health = analyzePriceHealth(spotPrice, vol);
     const sellPricingMode = sellMode || rankFilter.sellPricing || 'spot';
 
@@ -1551,7 +1570,7 @@ function render() {
   const active = document.activeElement;
   const focusKey = active && active.dataset ? active.dataset.fk : null;
   const scrollers = [...document.querySelectorAll('.tablewrap')].map(e => [e.scrollTop, e.scrollLeft]);
-  const views = { plan: viewPlan, rank: viewRank, refine: viewRefine, food: viewFood, prices: viewPrices, config: viewConfig };
+  const views = { plan: viewPlan, recommend: viewRecommend, rank: viewRank, refine: viewRefine, food: viewFood, prices: viewPrices, config: viewConfig };
   $('#view').innerHTML = views[VIEW]();
   document.querySelectorAll('.tablewrap').forEach((e, i) => { if (scrollers[i]) [e.scrollTop, e.scrollLeft] = scrollers[i]; });
   if (focusKey) { const el = document.querySelector(`[data-fk="${CSS.escape(focusKey)}"]`); if (el) { el.focus(); if (el.select) el.select(); } }
@@ -1695,6 +1714,13 @@ function viewPlan() {
     <div class="stat"><div class="label">Giro Estimado do Lote</div><div class="value">${liquiditySummary(P.rows)}</div></div>
   </div>
   ${slippageBanner}
+  <div class="rec-banner-plan">
+    <div>
+      <span style="font-weight:700;color:var(--green);font-size:14px">🎯 Precisa de ideias de mix lucrativo e rápido?</span>
+      <div class="muted" style="font-size:12px;margin-top:2px">Use o <b>Recomendador de Mix</b> para combinar botas, armaduras ou arcos em múltiplos tiers seguros (ex: T5.1 + T6.1) sem saturar o mercado local.</div>
+    </div>
+    <button class="btn" data-gotoview="recommend" style="font-size:12px;padding:6px 14px">Abrir Recomendações ➔</button>
+  </div>
   ${P.missing.length ? `<div class="card" style="border-color:#6b5a2a">⚠️ Faltam preços para: <b>${esc([...new Set(P.missing)].join(', '))}</b> — preencha na aba Preços ou use “Buscar preços”.</div>` : ''}
   <div class="tablewrap"><table>
     <tr><th class="l">Item / Variante</th><th class="l">Peça / Tipo</th><th class="l">Tier</th><th>Qtd</th><th title="Custo líquido de Barras e/ou Tábuas (ou Peça Base para Reais)">Materiais / Base</th><th>Artefato / Emblema</th><th>Taxa estação</th>
@@ -1769,6 +1795,402 @@ function viewPlan() {
     ]) : ''}
   </div>
   <div class="muted">Quantidades arredondadas para cima. Se a proteção de volume estiver ativa, grandes lotes usam o Preço Médio Real de Volume (VWAP) para proteger seu investimento contra ofertas de 1 unidade no mercado.</div>`;
+}
+
+/* ----- Recomendações de Mix Inteligente ----- */
+function generateCraftRecommendation(customOpts = {}) {
+  const f = { ...recommendFilter, ...customOpts };
+  const bars = computeBars();
+  const planks = computePlanks();
+  const candidates = [];
+
+  for (const v of GD.variants) {
+    if (f.cat && (v.cat || 'plate') !== f.cat) continue;
+    if (f.variantType === 'standard' && (v.artifact || v.royal)) continue;
+    if (f.variantType === 'artifact' && !v.artifact) continue;
+    if (f.variantType === 'royal' && !v.royal) continue;
+    if (f.variant && v.code !== f.variant) continue;
+
+    for (const p of piecesOf(v)) {
+      if (f.slot && p.slot !== f.slot) continue;
+
+      for (const k of TIERS) {
+        const [tierNum, enchNum] = tv(k);
+        if (tierNum < Number(f.tmin) || tierNum > Number(f.tmax)) continue;
+        if (enchNum === 0 && !f.ench0) continue;
+        if (enchNum === 1 && !f.ench1) continue;
+        if (enchNum === 2 && !f.ench2) continue;
+        if (enchNum === 3 && !f.ench3) continue;
+
+        const it = computeItem(bars, v.code, p.slot, k, 'mix', planks, 'smart');
+        if (it.profit === null || it.margin === null || it.profit <= 0) continue;
+        if (it.margin < Number(f.minMargin)) continue;
+
+        const daily = (it.dailyVol !== null && it.dailyVol !== undefined && it.dailyVol > 0)
+          ? it.dailyVol
+          : (it.vol?.daily || getBestVol(it.id)?.daily || 0);
+
+        if (f.safeOnly && (daily <= 0 || (it.health && it.health.status === 'nosales'))) continue;
+        if (f.safeOnly && it.health && it.health.status === 'inflated' && (!it.effectiveSellPrice || it.effectiveSellPrice === it.spotPrice)) continue;
+
+        // Bônus Diário
+        const itemBonus = getItemDailyBonus(it.v, it.p);
+
+        // Pontuação algorítmica:
+        // Margem (até 45 pts), volume diário/liquidez (até 65 pts), lucro unitário (até 25 pts)
+        const marginScore = Math.min(Math.max(0, it.margin), 0.60) * 75;
+        const volScore = Math.min(Math.sqrt(daily) * 7.5, 65);
+        const profitScore = Math.min(Math.max(0, it.profit) / 1000, 25);
+
+        let score = marginScore + volScore + profitScore;
+        if (f.prioritizeBonus && itemBonus) {
+          score *= 1.35; // 35% de bônus para itens com bônus diário de produção ativo hoje
+        }
+
+        // Horizonte e limite de segurança para venda rápida sem derrubar o mercado:
+        // 'fast' (~1-2 dias): absorve no máximo 35% da demanda diária
+        // 'normal' (~2-4 dias): absorve até 50% da demanda diária
+        // 'slow' (~4-7 dias): absorve até 75% da demanda diária
+        const horizonFactor = f.horizon === 'fast' ? 0.35 : (f.horizon === 'slow' ? 0.75 : 0.50);
+        const horizonDays = f.horizon === 'fast' ? 1.5 : (f.horizon === 'slow' ? 5.0 : 2.5);
+        let maxSafeQty = Math.max(2, Math.floor(daily * horizonDays * horizonFactor));
+
+        // Nenhuma peça única pode monopolizar uma fatia exagerada do lote
+        const target = Number(f.targetPieces) || 50;
+        const maxBatchShare = Math.max(5, Math.floor(target * 0.40));
+        maxSafeQty = Math.min(maxSafeQty, maxBatchShare);
+
+        candidates.push({
+          it,
+          score,
+          daily,
+          itemBonus,
+          maxSafeQty,
+          allocatedQty: 0
+        });
+      }
+    }
+  }
+
+  const target = Number(f.targetPieces) || 50;
+
+  if (!candidates.length) {
+    return {
+      items: [],
+      targetPieces: target,
+      totalUnits: 0,
+      totalCost: 0,
+      totalRevenue: 0,
+      totalProfit: 0,
+      avgMargin: 0,
+      estDays: 0,
+      bonusCount: 0
+    };
+  }
+
+  // Ordenar do maior score para o menor
+  candidates.sort((a, b) => b.score - a.score);
+
+  // Seleção de variedade equilibrada:
+  let targetVariety = f.variety === 'focused' ? 3 : (f.variety === 'high' ? 8 : 5);
+  if (target <= 20) targetVariety = Math.min(targetVariety, 3);
+  if (target <= 40) targetVariety = Math.min(targetVariety, 5);
+
+  const selected = [];
+  const variantUsage = {};
+
+  for (const c of candidates) {
+    if (selected.length >= targetVariety) break;
+    const vCode = c.it.code;
+    const count = variantUsage[vCode] || 0;
+    if (count >= 2 && selected.length < targetVariety - 1) continue;
+    selected.push(c);
+    variantUsage[vCode] = count + 1;
+  }
+
+  if (selected.length < targetVariety) {
+    for (const c of candidates) {
+      if (!selected.includes(c)) {
+        selected.push(c);
+        if (selected.length >= targetVariety) break;
+      }
+    }
+  }
+
+  // Fase 1: Distribuição base de partida (ex: 5 a 10 unidades por item selecionado)
+  let remaining = target;
+  for (const c of selected) {
+    const base = Math.min(Math.max(2, Math.min(5, Math.floor(remaining / selected.length))), c.maxSafeQty);
+    c.allocatedQty = base;
+    remaining -= base;
+  }
+
+  // Fase 2: Distribuição do restante de acordo com o score e headroom seguro
+  let attempts = 0;
+  while (remaining > 0 && attempts < 60) {
+    attempts++;
+    let addedAny = false;
+    for (const c of selected) {
+      if (remaining <= 0) break;
+      const headroom = c.maxSafeQty - c.allocatedQty;
+      if (headroom >= 5 && remaining >= 5) {
+        c.allocatedQty += 5;
+        remaining -= 5;
+        addedAny = true;
+      } else if (headroom > 0) {
+        const step = Math.min(headroom, remaining);
+        c.allocatedQty += step;
+        remaining -= step;
+        addedAny = true;
+      }
+    }
+    if (!addedAny) break;
+  }
+
+  // Arredondamento limpo (múltiplos de 5 para lotes maiores)
+  for (const c of selected) {
+    if (c.allocatedQty >= 8) {
+      const rem = c.allocatedQty % 5;
+      if (rem === 4) c.allocatedQty += 1;
+      else if (rem === 1) c.allocatedQty -= 1;
+    }
+  }
+
+  // Montagem da lista final recomendada
+  const recItems = selected.filter(c => c.allocatedQty > 0).map(c => {
+    const it = c.it;
+    const qty = c.allocatedQty;
+    const daysToSell = c.daily > 0 ? (qty / c.daily).toFixed(1) : '—';
+    const totalCost = it.cost !== null ? it.cost * qty : 0;
+    const totalProfit = it.profit !== null ? it.profit * qty : 0;
+    const revenue = it.effectiveSellPrice !== null ? it.effectiveSellPrice * qty : 0;
+
+    const reasons = [];
+    if (c.itemBonus) {
+      reasons.push({ cls: 'bonus', text: `🔥 Bônus Hoje (${c.itemBonus.name})` });
+    }
+    if (c.daily >= 20) {
+      reasons.push({ cls: 'highvol', text: `⚡ Alta Demanda (~${Math.round(c.daily)} un/dia)` });
+    }
+    if (it.margin >= 0.18) {
+      reasons.push({ cls: 'margin', text: `💰 Margem ${pct(it.margin)}` });
+    }
+    if (it.health && it.health.status === 'stable') {
+      reasons.push({ cls: '', text: '🛡️ Preço Confiável' });
+    }
+    if (it.effectiveSellPrice !== null && it.effectiveSellPrice !== it.spotPrice) {
+      reasons.push({ cls: '', text: '🛡️ Protegido via VWAP' });
+    }
+
+    return {
+      ...it,
+      recQty: qty,
+      daysToSell,
+      totalCost,
+      totalProfit,
+      revenue,
+      reasons,
+      score: c.score
+    };
+  });
+
+  const totalUnits = recItems.reduce((acc, r) => acc + r.recQty, 0);
+  const totalCost = recItems.reduce((acc, r) => acc + r.totalCost, 0);
+  const totalProfit = recItems.reduce((acc, r) => acc + r.totalProfit, 0);
+  const totalRevenue = recItems.reduce((acc, r) => acc + r.revenue, 0);
+  const avgMargin = totalCost > 0 ? totalProfit / totalCost : 0;
+  const estDays = recItems.length ? Math.max(...recItems.map(r => Number(r.daysToSell) || 1)).toFixed(1) : '1.0';
+  const bonusCount = recItems.filter(r => r.reasons.some(x => x.cls === 'bonus')).length;
+
+  return {
+    items: recItems,
+    targetPieces: target,
+    totalUnits,
+    totalCost,
+    totalProfit,
+    totalRevenue,
+    avgMargin,
+    estDays,
+    bonusCount
+  };
+}
+
+function viewRecommend() {
+  if (!activeRecommendation) {
+    activeRecommendation = generateCraftRecommendation();
+  }
+  const f = recommendFilter;
+  const rec = activeRecommendation;
+
+  const rowsHtml = rec.items.map((it, i) => {
+    const isVwapUsed = it.effectiveSellPrice !== null && it.effectiveSellPrice !== it.spotPrice;
+    const sellPriceDisplay = isVwapUsed
+      ? `${fmt(it.effectiveSellPrice)} <span class="muted" style="font-size:10px" title="Preço ajustado via VWAP">(VWAP)</span>`
+      : fmt(it.spotPrice);
+
+    const sellHtml = it.sell ? `
+      <span class="q-badge q-${it.sell.quality || '1'}" title="${esc(it.sell.qualityName || '')}">${it.sell.qualityLabel || 'Q1'}</span>
+      <span class="badge-tip" title="${esc(formatQualityTooltip(it.sell.breakdown, it.spotPrice, it.sell.qualityLabel))}">${sellPriceDisplay}</span>
+    ` : '—';
+
+    const reasonsHtml = it.reasons.map(r => `<span class="rec-reason ${r.cls}">${esc(r.text)}</span>`).join(' ');
+
+    const itemBonus = getItemDailyBonus(it.v, it.p);
+    const bonusBadge = itemBonus ? ` <span class="tag pos" style="background:#3a2910;border-color:var(--accent);color:var(--accent);font-weight:700" title="Bônus Ativo: ${esc(itemBonus.name)}">🔥 BÔNUS</span>` : '';
+
+    return `
+    <tr class="${itemBonus ? 'bonus-glow' : ''}">
+      <td class="l"><b>${esc(it.v.name)}</b>${bonusBadge}</td>
+      <td class="l">${esc(it.p.name)}</td>
+      <td class="l"><span class="tag">T${it.k}</span></td>
+      <td><input class="num" type="number" min="1" max="500" data-rec-qty="${i}" value="${it.recQty}" style="width:65px;font-weight:700"></td>
+      <td><span class="badge-tip" title="${esc(matBreakdownTip(it))}">${fmt(it.cost)}</span></td>
+      <td><b>${fmt(it.totalCost)}</b></td>
+      <td class="best">${sellHtml}</td>
+      <td class="l">${it.sell ? locName(it.sell.loc) : '—'}</td>
+      <td>${priceHealthBadge(it.spotPrice, it.vol, it.id, it.sell ? it.sell.loc : '')}</td>
+      <td class="${cls(it.profit)}">${fmt(it.profit)}</td>
+      <td class="${cls(it.margin)}">${pct(it.margin)}</td>
+      <td class="${cls(it.totalProfit)}"><b>${fmt(it.totalProfit)}</b></td>
+      <td>${volBadge(it.vol, it.sell ? locName(it.sell.loc) : '', it.id, it.sell ? it.sell.loc : '')}</td>
+      <td><span class="pill win" title="Tempo estimado para escoar este lote no mercado">~${it.daysToSell} dias 🟢</span></td>
+      <td class="l">${reasonsHtml}</td>
+      <td><button class="icon" data-rec-del="${i}" title="Remover este item do mix">✕</button></td>
+    </tr>`;
+  }).join('');
+
+  return `
+  <div class="rec-hero">
+    <h2>🎯 Recomendador de Mix Inteligente de Craft</h2>
+    <div style="font-size:13px;color:rgba(255,255,255,0.85);max-width:960px;line-height:1.5">
+      Escolha o que você quer craftar (ex: <b>Botas</b>, <b>Armaduras</b> ou <b>Arcos</b>) e o sistema calcula a combinação ideal de variantes e tiers (ex: <i>15x Botas de Soldado T5.1, 15x Botas de Guardião T5.1, 10x Botas de Cavaleiro T5.1, 5x Soldado T6.1, 5x Guardião T5.0</i>).
+      Em vez de despejar 50 itens iguais e estragar o preço da cidade, o mix garante <b>venda rápida em 1 a 3 dias</b> com <b>lucros altos</b> e proteção de mercado.
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:16px">
+    <div class="toolbar" style="margin:0;gap:12px;align-items:flex-start">
+      <label>Peça / Equipamento<select data-rec="slot">
+        <option value="SHOES"${f.slot === 'SHOES' ? ' selected' : ''}>👢 Botas / Calçados</option>
+        <option value="ARMOR"${f.slot === 'ARMOR' ? ' selected' : ''}>🛡️ Armaduras / Peitorais</option>
+        <option value="HEAD"${f.slot === 'HEAD' ? ' selected' : ''}>👑 Elmos / Capacetes</option>
+        <option value="BOW"${f.slot === 'BOW' ? ' selected' : ''}>🏹 Arcos</option>
+        <option value="CROSSBOW"${f.slot === 'CROSSBOW' ? ' selected' : ''}>🎯 Bestas</option>
+        <option value=""${f.slot === '' ? ' selected' : ''}>⚡ Todas as Peças (Mix Completo)</option>
+      </select></label>
+
+      <label>Categoria<select data-rec="cat">
+        <option value="">Todas as Categorias</option>
+        ${catOpts(f.cat)}
+      </select></label>
+
+      <label>Variante Específica<select data-rec="variant">
+        <option value="">🎲 Qualquer / Variadas (Recomendado)</option>
+        ${variantOpts(f.variant, f.cat)}
+      </select></label>
+
+      <label>Família<select data-rec="variantType">
+        ${opt('all', 'Todos os Tipos', f.variantType)}
+        ${opt('standard', 'Apenas Padrão (Sem Artefatos)', f.variantType)}
+        ${opt('artifact', 'Apenas Artefatos', f.variantType)}
+        ${opt('royal', 'Apenas Reais (com Emblemas)', f.variantType)}
+      </select></label>
+
+      <label>Tier Mínimo<select data-rec="tmin">
+        ${[4, 5, 6, 7, 8].map(t => opt(t, 'T' + t, f.tmin)).join('')}
+      </select></label>
+
+      <label>Tier Máximo<select data-rec="tmax">
+        ${[4, 5, 6, 7, 8].map(t => opt(t, 'T' + t, f.tmax)).join('')}
+      </select></label>
+
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <span class="label">Encantamentos</span>
+        <div class="rec-chip-group">
+          <span class="rec-chip ${f.ench0 ? 'active' : ''}" data-rec-ench="0" title="Sem encantamento (.0)">.0</span>
+          <span class="rec-chip ${f.ench1 ? 'active' : ''}" data-rec-ench="1" title="Encantamento Verde (.1)">.1</span>
+          <span class="rec-chip ${f.ench2 ? 'active' : ''}" data-rec-ench="2" title="Encantamento Azul (.2)">.2</span>
+          <span class="rec-chip ${f.ench3 ? 'active' : ''}" data-rec-ench="3" title="Encantamento Roxo (.3)">.3</span>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <span class="label">Meta de Peças</span>
+        <div style="display:flex;align-items:center;gap:6px">
+          <div class="rec-chip-group">
+            <span class="rec-chip ${f.targetPieces === 30 ? 'active' : ''}" data-rec-target="30">30</span>
+            <span class="rec-chip ${f.targetPieces === 50 ? 'active' : ''}" data-rec-target="50">50</span>
+            <span class="rec-chip ${f.targetPieces === 75 ? 'active' : ''}" data-rec-target="75">75</span>
+            <span class="rec-chip ${f.targetPieces === 100 ? 'active' : ''}" data-rec-target="100">100</span>
+          </div>
+          <input class="num" type="number" min="5" max="500" step="5" data-rec="targetPieces" value="${f.targetPieces}" style="width:65px">
+        </div>
+      </div>
+
+      <label>Velocidade de Venda<select data-rec="horizon">
+        ${opt('fast', '⚡ Giro Ultra Rápido (~1 a 2 dias)', f.horizon)}
+        ${opt('normal', '🟢 Giro Normal (~2 a 4 dias)', f.horizon)}
+        ${opt('slow', '🟡 Giro Moderado (~4 a 7 dias)', f.horizon)}
+      </select></label>
+
+      <label>Diversificação<select data-rec="variety">
+        ${opt('balanced', '🎯 Equilibrado (4 a 6 itens)', f.variety)}
+        ${opt('high', '🎲 Alta Variedade (6 a 9 itens)', f.variety)}
+        ${opt('focused', '🔍 Focado (2 a 4 itens)', f.variety)}
+      </select></label>
+
+      <label>Margem Mínima<select data-rec="minMargin">
+        ${opt('0.05', '≥ 5%', f.minMargin)}
+        ${opt('0.10', '≥ 10%', f.minMargin)}
+        ${opt('0.15', '≥ 15%', f.minMargin)}
+        ${opt('0.20', '≥ 20%', f.minMargin)}
+        ${opt('0.25', '≥ 25%', f.minMargin)}
+      </select></label>
+    </div>
+
+    <div style="display:flex;gap:20px;align-items:center;margin-top:14px;flex-wrap:wrap">
+      <label style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" data-rec="prioritizeBonus" ${f.prioritizeBonus ? 'checked' : ''}> 🔥 Priorizar itens com Bônus Diário Ativo (+10%/+20%)</label>
+      <label style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" data-rec="safeOnly" ${f.safeOnly ? 'checked' : ''}> 🛡️ Apenas preços confiáveis (ocultar sem vendas ou inflados)</label>
+      <button class="btn" id="generateRecBtn" style="margin-left:auto;font-weight:700">🎲 Gerar Recomendação de Mix</button>
+    </div>
+  </div>
+
+  <div class="cards">
+    <div class="stat"><div class="label">Total de Peças Recomendadas</div><div class="value">${rec.totalUnits} <span class="muted" style="font-size:13px">(${rec.items.length} variações)</span></div></div>
+    <div class="stat"><div class="label">Investimento Total (Custo)</div><div class="value">${fmt(rec.totalCost)}</div></div>
+    <div class="stat"><div class="label">Receita Líquida Estimada</div><div class="value">${fmt(rec.totalRevenue)}</div></div>
+    <div class="stat"><div class="label">Lucro Líquido Esperado</div><div class="value ${cls(rec.totalProfit)}">+${fmt(rec.totalProfit)}</div></div>
+    <div class="stat"><div class="label">Margem Média Ponderada</div><div class="value ${cls(rec.avgMargin)}">${pct(rec.avgMargin)}</div></div>
+    <div class="stat"><div class="label">Giro Estimado do Lote</div><div class="value"><span class="pos" style="font-size:16px">🟢 ~${rec.estDays} dias</span></div></div>
+  </div>
+
+  <div class="tablewrap"><table>
+    <tr>
+      <th class="l">Item / Variante</th>
+      <th class="l">Peça</th>
+      <th class="l">Tier</th>
+      <th>Qtd Recomendada</th>
+      <th>Custo / un</th>
+      <th>Custo Total</th>
+      <th>Melhor Venda</th>
+      <th class="l">Local</th>
+      <th>Saúde</th>
+      <th>Lucro / un</th>
+      <th>Margem</th>
+      <th>Lucro Total</th>
+      <th title="Volume médio diário de compras nos últimos 28 dias">Demanda / dia</th>
+      <th title="Tempo estimado para escoar este lote">Tempo p/ Vender</th>
+      <th class="l">Motivos & Selos</th>
+      <th></th>
+    </tr>
+    ${rowsHtml || '<tr><td colspan="16" class="empty">Nenhum item encontrado com os filtros atuais. Experimente reduzir a margem mínima ou liberar mais encantamentos.</td></tr>'}
+  </table></div>
+
+  <div class="toolbar" style="margin-top:14px">
+    <button class="btn" id="applyRecPlanBtn" style="font-weight:700;font-size:14px;padding:8px 18px" ${!rec.items.length ? 'disabled' : ''}>⚡ Aplicar este Mix ao Planejador (Substituir)</button>
+    <button class="ghost" id="addRecPlanBtn" ${!rec.items.length ? 'disabled' : ''}>➕ Adicionar ao Planejador Existente</button>
+    <button class="ghost" id="regenRecBtn">🎲 Gerar Outra Opção</button>
+  </div>`;
 }
 
 /* ----- Ranking ----- */
@@ -3929,13 +4351,104 @@ function bind() {
       }
       return;
     }
+    if (d.rec) {
+      recommendFilter[d.rec] = el.type === 'checkbox' ? el.checked : el.value;
+      if (d.rec === 'cat') {
+        recommendFilter.variant = '';
+      }
+      activeRecommendation = generateCraftRecommendation();
+      return render();
+    }
+    if (d.recQty !== undefined) {
+      if (activeRecommendation && activeRecommendation.items[Number(d.recQty)]) {
+        const val = Math.max(1, Number(el.value) || 1);
+        activeRecommendation.items[Number(d.recQty)].recQty = val;
+        const items = activeRecommendation.items;
+        items.forEach(it => {
+          it.totalCost = it.cost !== null ? it.cost * it.recQty : 0;
+          it.totalProfit = it.profit !== null ? it.profit * it.recQty : 0;
+          it.revenue = it.effectiveSellPrice !== null ? it.effectiveSellPrice * it.recQty : 0;
+          it.daysToSell = (it.dailyVol !== null && it.dailyVol > 0) ? (it.recQty / it.dailyVol).toFixed(1) : '—';
+        });
+        activeRecommendation.totalUnits = items.reduce((a, b) => a + b.recQty, 0);
+        activeRecommendation.totalCost = items.reduce((a, b) => a + b.totalCost, 0);
+        activeRecommendation.totalProfit = items.reduce((a, b) => a + b.totalProfit, 0);
+        activeRecommendation.totalRevenue = items.reduce((a, b) => a + b.revenue, 0);
+        activeRecommendation.avgMargin = activeRecommendation.totalCost > 0 ? activeRecommendation.totalProfit / activeRecommendation.totalCost : 0;
+        activeRecommendation.estDays = items.length ? Math.max(...items.map(r => Number(r.daysToSell) || 1)).toFixed(1) : '1.0';
+        return render();
+      }
+    }
     if (el.id === 'importFile' && el.files[0]) {
       el.files[0].text().then(t => { ST = JSON.parse(t); changed(); toast('Backup importado.'); }).catch(() => toast('Arquivo inválido.'));
     }
   });
   view.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.matches('input.num')) e.target.blur(); });
   view.addEventListener('click', e => {
+    const chipEnch = e.target.closest('[data-rec-ench]');
+    if (chipEnch) {
+      const eNum = chipEnch.dataset.recEnch;
+      recommendFilter['ench' + eNum] = !recommendFilter['ench' + eNum];
+      activeRecommendation = generateCraftRecommendation();
+      return render();
+    }
+    const chipTarget = e.target.closest('[data-rec-target]');
+    if (chipTarget) {
+      recommendFilter.targetPieces = Number(chipTarget.dataset.recTarget);
+      activeRecommendation = generateCraftRecommendation();
+      return render();
+    }
+    const gotoBtn = e.target.closest('[data-gotoview]');
+    if (gotoBtn) {
+      VIEW = gotoBtn.dataset.gotoview;
+      document.querySelectorAll('#tabs button').forEach(x => x.classList.toggle('active', x.dataset.view === VIEW));
+      return render();
+    }
     const t = e.target.closest('button'); if (!t) return;
+    if (t.id === 'generateRecBtn' || t.id === 'regenRecBtn') {
+      activeRecommendation = generateCraftRecommendation();
+      render();
+      return toast('🎲 Mix de craft atualizado!');
+    }
+    if (t.dataset.recDel !== undefined) {
+      if (activeRecommendation) {
+        activeRecommendation.items.splice(Number(t.dataset.recDel), 1);
+        const items = activeRecommendation.items;
+        activeRecommendation.totalUnits = items.reduce((a, b) => a + b.recQty, 0);
+        activeRecommendation.totalCost = items.reduce((a, b) => a + b.totalCost, 0);
+        activeRecommendation.totalProfit = items.reduce((a, b) => a + b.totalProfit, 0);
+        activeRecommendation.totalRevenue = items.reduce((a, b) => a + b.revenue, 0);
+        activeRecommendation.avgMargin = activeRecommendation.totalCost > 0 ? activeRecommendation.totalProfit / activeRecommendation.totalCost : 0;
+        activeRecommendation.estDays = items.length ? Math.max(...items.map(r => Number(r.daysToSell) || 1)).toFixed(1) : '1.0';
+        return render();
+      }
+    }
+    if (t.id === 'applyRecPlanBtn') {
+      if (!activeRecommendation || !activeRecommendation.items.length) return toast('Nenhum item recomendado para aplicar.');
+      ST.plan = activeRecommendation.items.map(it => ({ code: it.code, slot: it.slot, k: it.k, qty: it.recQty }));
+      save();
+      VIEW = 'plan';
+      document.querySelectorAll('#tabs button').forEach(x => x.classList.toggle('active', x.dataset.view === 'plan'));
+      render();
+      return toast('⚡ Mix de craft aplicado com sucesso ao Planejador!');
+    }
+    if (t.id === 'addRecPlanBtn') {
+      if (!activeRecommendation || !activeRecommendation.items.length) return toast('Nenhum item recomendado para adicionar.');
+      ST.plan = ST.plan || [];
+      for (const it of activeRecommendation.items) {
+        const existing = ST.plan.find(p => p.code === it.code && p.slot === it.slot && p.k === it.k);
+        if (existing) {
+          existing.qty = (Number(existing.qty) || 0) + it.recQty;
+        } else {
+          ST.plan.push({ code: it.code, slot: it.slot, k: it.k, qty: it.recQty });
+        }
+      }
+      save();
+      VIEW = 'plan';
+      document.querySelectorAll('#tabs button').forEach(x => x.classList.toggle('active', x.dataset.view === 'plan'));
+      render();
+      return toast('➕ Mix adicionado ao Planejador existente!');
+    }
     if (t.id === 'cancelFetchBtn') return cancelActiveFetch();
     if (t.id === 'addPlan') { const last = ST.plan[ST.plan.length - 1]; ST.plan.push(last ? { ...last } : { code: 'SET1', slot: 'ARMOR', k: '4.0', qty: 10 }); return changed(); }
     if (t.id === 'clearPlan') { if (confirm('Limpar todo o plano?')) { ST.plan = []; changed(); } return; }
