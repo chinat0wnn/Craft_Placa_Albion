@@ -204,14 +204,20 @@ function minBuy(id, locs = null) {
   return best;
 }
 
-function getQualityBreakdown(id) {
+function getQualityBreakdown(id, minVol = 0) {
   const bd = {};
   let lastKnownPrice = null, lastKnownLoc = null, lastKnownQ = null;
   for (const qObj of QUALITIES) {
     let best = null;
     for (const c of GD.saleLocs) {
       const v = getQP(id, c, qObj.q);
-      if (v && (!best || v > best.price)) best = { price: v, loc: c, quality: qObj.q, isFallback: false };
+      if (!v || v <= 0) continue;
+      if (minVol > 0) {
+        const volObj = getVol(id, c);
+        const d = volObj ? (volObj.daily || 0) : 0;
+        if (d < minVol) continue;
+      }
+      if (!best || v > best.price) best = { price: v, loc: c, quality: qObj.q, isFallback: false };
     }
     if (best) {
       bd[qObj.q] = best;
@@ -225,18 +231,30 @@ function getQualityBreakdown(id) {
   return bd;
 }
 
-function bestSellForQuality(id, targetQ = 1) {
+function bestSellForQuality(id, targetQ = 1, minVol = 0) {
   const qNum = Number(targetQ) || 1;
   let best = null;
   for (const c of GD.saleLocs) {
     const v = getQP(id, c, qNum);
-    if (v && (!best || v > best.price)) best = { price: v, loc: c, quality: qNum, isFallback: false };
+    if (!v || v <= 0) continue;
+    if (minVol > 0) {
+      const volObj = getVol(id, c);
+      const d = volObj ? (volObj.daily || 0) : 0;
+      if (d < minVol) continue;
+    }
+    if (!best || v > best.price) best = { price: v, loc: c, quality: qNum, isFallback: false };
   }
   if (!best && qNum > 1) {
     for (let fallbackQ = qNum - 1; fallbackQ >= 1; fallbackQ--) {
       for (const c of GD.saleLocs) {
         const v = getQP(id, c, fallbackQ);
-        if (v && (!best || v > best.price)) best = { price: v, loc: c, quality: fallbackQ, isFallback: true, reqQuality: qNum };
+        if (!v || v <= 0) continue;
+        if (minVol > 0) {
+          const volObj = getVol(id, c);
+          const d = volObj ? (volObj.daily || 0) : 0;
+          if (d < minVol) continue;
+        }
+        if (!best || v > best.price) best = { price: v, loc: c, quality: fallbackQ, isFallback: true, reqQuality: qNum };
       }
       if (best) break;
     }
@@ -244,13 +262,13 @@ function bestSellForQuality(id, targetQ = 1) {
   return best;
 }
 
-function bestSellQuality(id, mode = 'mix') {
-  const bd = getQualityBreakdown(id);
+function bestSellQuality(id, mode = 'mix', minVol = 0) {
+  const bd = getQualityBreakdown(id, minVol);
   const q1 = bd[1];
 
   if (mode && mode !== 'mix' && mode !== 'best') {
     const qNum = Number(mode) || 1;
-    const s = bestSellForQuality(id, qNum);
+    const s = bestSellForQuality(id, qNum, minVol);
     if (!s) return null;
     const qObj = QUALITIES.find(x => x.q === qNum) || { short: `Q${qNum}`, name: `Qualidade ${qNum}` };
     return {
@@ -755,7 +773,7 @@ function computePlanks() {
   return computeRefinedChain(woodId, plankId, WOOD_QTY, ST.plankOrigins || {});
 }
 
-function computeBaseItem(bars, code, slot, k, targetQ = null, planks = null, sellMode = null) {
+function computeBaseItem(bars, code, slot, k, targetQ = null, planks = null, sellMode = null, minVol = 0) {
   const c = ST.config, v = variant(code) || GD.variants[0];
   let p = piece(slot);
   if (!p || (p.cat || 'plate') !== (v.cat || 'plate')) {
@@ -779,9 +797,9 @@ function computeBaseItem(bars, code, slot, k, targetQ = null, planks = null, sel
   const cost = (barsCost !== null && artCost !== null) ? barsCost + artCost + fee : null;
   const itId = itemId(code, slot, k);
   const qMode = targetQ || rankFilter.quality || ST.config.targetQuality || 'mix';
-  const sell = bestSellQuality(itId, qMode);
+  const sell = bestSellQuality(itId, qMode, minVol);
   const spotPrice = sell ? sell.price : null;
-  const vol = sell ? (getVol(itId, sell.loc) || getBestVol(itId)) : getBestVol(itId);
+  const vol = sell ? (getVol(itId, sell.loc) || (minVol > 0 ? null : getBestVol(itId))) : null;
   const health = analyzePriceHealth(spotPrice, vol);
   const sellPricingMode = sellMode || rankFilter.sellPricing || 'spot';
 
@@ -811,7 +829,7 @@ function computeBaseItem(bars, code, slot, k, targetQ = null, planks = null, sel
   };
 }
 
-function computeItem(bars, code, slot, k, targetQ = null, planks = null, sellMode = null) {
+function computeItem(bars, code, slot, k, targetQ = null, planks = null, sellMode = null, minVol = 0) {
   const c = ST.config, v = variant(code) || GD.variants[0];
   let p = piece(slot);
   if (!p || (p.cat || 'plate') !== (v.cat || 'plate')) {
@@ -831,7 +849,7 @@ function computeItem(bars, code, slot, k, targetQ = null, planks = null, sellMod
     let bestBase = null;
     for (const bCode of roy.baseSets) {
       const bV = variant(bCode);
-      const bIt = computeBaseItem(bars, bCode, slot, k, targetQ, planks, sellMode);
+      const bIt = computeBaseItem(bars, bCode, slot, k, targetQ, planks, sellMode, minVol);
       const bBuy = getMaterialBuy(itemId(bCode, slot, k), 1);
       const bBuyCost = bBuy ? bBuy.price * (1 + c.taxBuy) : null;
 
@@ -851,9 +869,9 @@ function computeItem(bars, code, slot, k, targetQ = null, planks = null, sellMod
     const fee = 0;
     const cost = (baseCost !== null && sigilCost !== null) ? baseCost + sigilCost + fee : null;
     const itId = itemId(code, slot, k);
-    const sell = bestSellQuality(itId, qMode);
+    const sell = bestSellQuality(itId, qMode, minVol);
     const spotPrice = sell ? sell.price : null;
-    const vol = sell ? (getVol(itId, sell.loc) || getBestVol(itId)) : getBestVol(itId);
+    const vol = sell ? (getVol(itId, sell.loc) || (minVol > 0 ? null : getBestVol(itId))) : null;
     const health = analyzePriceHealth(spotPrice, vol);
     const sellPricingMode = sellMode || rankFilter.sellPricing || 'spot';
 
@@ -891,7 +909,7 @@ function computeItem(bars, code, slot, k, targetQ = null, planks = null, sellMod
     };
   }
 
-  return computeBaseItem(bars, code, slot, k, targetQ, planks, sellMode);
+  return computeBaseItem(bars, code, slot, k, targetQ, planks, sellMode, minVol);
 }
 
 function decomposeChainDemands(directMap, chainMap, rawIdFn, refIdFn, rawName, refName, missing) {
@@ -1822,16 +1840,17 @@ function generateCraftRecommendation(customOpts = {}) {
         if (enchNum === 2 && !f.ench2) continue;
         if (enchNum === 3 && !f.ench3) continue;
 
-        const it = computeItem(bars, v.code, p.slot, k, 'mix', planks, 'smart');
-        if (it.profit === null || it.margin === null || it.profit <= 0) continue;
+        const reqMinVol = f.horizon === 'fast' ? 2.5 : (f.horizon === 'slow' ? 0.8 : 1.2);
+        const it = computeItem(bars, v.code, p.slot, k, 'mix', planks, 'smart', reqMinVol);
+        if (!it || !it.sell || it.profit === null || it.margin === null || it.profit <= 0) continue;
         if (it.margin < Number(f.minMargin)) continue;
 
-        const daily = (it.dailyVol !== null && it.dailyVol !== undefined && it.dailyVol > 0)
-          ? it.dailyVol
-          : (it.vol?.daily || getBestVol(it.id)?.daily || 0);
+        // Volume estritamente da cidade onde o item será vendido
+        const daily = (it.dailyVol !== null && it.dailyVol !== undefined) ? it.dailyVol : 0;
+        if (daily < reqMinVol) continue;
 
-        if (f.safeOnly && (daily <= 0 || (it.health && it.health.status === 'nosales'))) continue;
-        if (f.safeOnly && it.health && it.health.status === 'inflated' && (!it.effectiveSellPrice || it.effectiveSellPrice === it.spotPrice)) continue;
+        // Bloqueia itens sem histórico ou sem vendas na cidade de destino, ou com preços anormais/inflados
+        if (f.safeOnly && it.health && (it.health.status === 'nosales' || it.health.status === 'nodata' || it.health.status === 'inflated')) continue;
 
         // Bônus Diário
         const itemBonus = getItemDailyBonus(it.v, it.p);
