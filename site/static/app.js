@@ -28,6 +28,7 @@ let recommendFilter = {
   ench2: true,
   ench3: false,
   targetPieces: 50,
+  maxBudget: 0,
   horizon: 'fast',
   minMargin: 0.10,
   prioritizeBonus: true,
@@ -1975,6 +1976,49 @@ function generateCraftRecommendation(customOpts = {}) {
     }
   }
 
+  // Ajuste fino por Orçamento Máximo / Capital em Caixa (Filtro Opcional)
+  const maxBudget = Number(f.maxBudget) || 0;
+  if (maxBudget > 0) {
+    const calcCost = () => selected.reduce((acc, c) => acc + ((c.it.cost || 0) * c.allocatedQty), 0);
+    let curCost = calcCost();
+
+    // Se o custo ultrapassar o orçamento, reduz gradualmente dos itens com menor score
+    if (curCost > maxBudget) {
+      const sortedByLowestScore = [...selected].sort((a, b) => a.score - b.score);
+      let redAttempts = 0;
+      while (curCost > maxBudget && redAttempts < 200) {
+        redAttempts++;
+        let reduced = false;
+        for (const c of sortedByLowestScore) {
+          if (c.allocatedQty > 0 && curCost > maxBudget) {
+            c.allocatedQty -= 1;
+            curCost -= (c.it.cost || 0);
+            reduced = true;
+            if (curCost <= maxBudget) break;
+          }
+        }
+        if (!reduced) break;
+      }
+    } else if (curCost < maxBudget * 0.92) {
+      // Se sobrou bastante caixa e o usuário definiu orçamento, tenta preencher com itens de maior score
+      const sortedByHighestScore = [...selected].sort((a, b) => b.score - a.score);
+      let addAttempts = 0;
+      while (curCost < maxBudget && addAttempts < 100) {
+        addAttempts++;
+        let added = false;
+        for (const c of sortedByHighestScore) {
+          const itemCost = c.it.cost || 0;
+          if (itemCost > 0 && (curCost + itemCost) <= maxBudget && c.allocatedQty < c.maxSafeQty * 1.5) {
+            c.allocatedQty += 1;
+            curCost += itemCost;
+            added = true;
+          }
+        }
+        if (!added) break;
+      }
+    }
+  }
+
   // Montagem da lista final recomendada
   const recItems = selected.filter(c => c.allocatedQty > 0).map(c => {
     const it = c.it;
@@ -2143,6 +2187,20 @@ function viewRecommend() {
             <span class="rec-chip ${f.targetPieces === 100 ? 'active' : ''}" data-rec-target="100">100</span>
           </div>
           <input class="num" type="number" min="5" max="500" step="5" data-rec="targetPieces" value="${f.targetPieces}" style="width:65px">
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <span class="label" title="Valor máximo que você tem disponível para investir na compra/refino dos materiais deste lote">Orçamento / Caixa (Opcional)</span>
+        <div style="display:flex;align-items:center;gap:6px">
+          <div class="rec-chip-group">
+            <span class="rec-chip ${f.maxBudget === 0 ? 'active' : ''}" data-rec-budget="0" title="Sem limite de valor em caixa">Ilimitado</span>
+            <span class="rec-chip ${f.maxBudget === 500000 ? 'active' : ''}" data-rec-budget="500000">500k</span>
+            <span class="rec-chip ${f.maxBudget === 1000000 ? 'active' : ''}" data-rec-budget="1000000">1M</span>
+            <span class="rec-chip ${f.maxBudget === 2000000 ? 'active' : ''}" data-rec-budget="2000000">2M</span>
+            <span class="rec-chip ${f.maxBudget === 5000000 ? 'active' : ''}" data-rec-budget="5000000">5M</span>
+          </div>
+          <input class="num" type="number" min="0" step="50000" data-rec="maxBudget" placeholder="Ex: 1500000" value="${f.maxBudget ? f.maxBudget : ''}" style="width:115px" title="Deixe vazio ou 0 para ilimitado">
         </div>
       </div>
 
@@ -4414,6 +4472,12 @@ function bind() {
     const chipTarget = e.target.closest('[data-rec-target]');
     if (chipTarget) {
       recommendFilter.targetPieces = Number(chipTarget.dataset.recTarget);
+      activeRecommendation = generateCraftRecommendation();
+      return render();
+    }
+    const chipBudget = e.target.closest('[data-rec-budget]');
+    if (chipBudget) {
+      recommendFilter.maxBudget = Number(chipBudget.dataset.recBudget);
       activeRecommendation = generateCraftRecommendation();
       return render();
     }

@@ -7,10 +7,12 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 import gzip, json, os, threading, time, urllib.error, urllib.parse, urllib.request, webbrowser
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-STATIC = os.path.join(HERE, "static")
-DATA = os.path.join(HERE, "data.json")
-GAMEDATA = os.path.join(HERE, "gamedata.json")
-PORT = 8765
+STATIC = os.environ.get("STATIC_DIR", os.path.join(HERE, "static"))
+DATA = os.environ.get("DATA_PATH", os.path.join(HERE, "data.json"))
+GAMEDATA = os.environ.get("GAMEDATA_PATH", os.path.join(HERE, "gamedata.json"))
+HOST = os.environ.get("HOST", "0.0.0.0")
+PORT = int(os.environ.get("PORT", "8765"))
+AUTH_TOKEN = os.environ.get("AUTH_TOKEN", "").strip()
 API_HOSTS = {"west": "west", "east": "east", "europe": "europe"}
 lock = threading.Lock()
 api_cache = {}
@@ -82,6 +84,20 @@ live_status = {
     "total_received": 0
 }
 
+
+
+def is_authorized(headers, query_params):
+    if not AUTH_TOKEN:
+        return True
+    token_header = headers.get("X-Auth-Token") or headers.get("Authorization")
+    if token_header:
+        if token_header.startswith("Bearer "):
+            token_header = token_header[7:].strip()
+        if token_header == AUTH_TOKEN:
+            return True
+    if query_params.get("token", [""])[0] == AUTH_TOKEN:
+        return True
+    return False
 
 class Handler(SimpleHTTPRequestHandler):
     def __init__(self, *a, **kw):
@@ -161,6 +177,9 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_POST(self):
         url = urllib.parse.urlparse(self.path)
+        q = urllib.parse.parse_qs(url.query)
+        if not is_authorized(self.headers, q):
+            return self._json({"error": "Unauthorized (token invalido ou ausente)"}, 401)
         if url.path == "/api/state":
             n = int(self.headers.get("Content-Length", 0))
             try:
@@ -279,11 +298,11 @@ class Handler(SimpleHTTPRequestHandler):
 if __name__ == "__main__":
     if not os.path.exists(GAMEDATA) or not os.path.exists(DATA):
         import build_data  # noqa: F401  (gera os arquivos)
-    srv = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
-    url = f"http://127.0.0.1:{PORT}"
+    srv = ThreadingHTTPServer((HOST, PORT), Handler)
+    url = f"http://{HOST}:{PORT}"
     print(f"Albion Craft rodando em {url}  (Ctrl+C para parar)")
-    if os.environ.get("NO_BROWSER") != "1":
-        threading.Timer(0.8, lambda: webbrowser.open(url)).start()
+    if os.environ.get("NO_BROWSER") != "1" and HOST in ("127.0.0.1", "localhost"):
+        threading.Timer(0.8, lambda: webbrowser.open(f"http://127.0.0.1:{PORT}")).start()
     try:
         srv.serve_forever()
     except KeyboardInterrupt:

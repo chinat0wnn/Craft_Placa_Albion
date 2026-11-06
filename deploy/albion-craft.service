@@ -1,0 +1,18 @@
+[Unit]
+Description=Albion Craft Web Server
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/albion-craft/site
+ExecStart=/usr/bin/python3 /home/ubuntu/albion-craft/site/server.py
+Restart=always
+RestartSec=3
+Environment=HOST=0.0.0.0
+Environment=PORT=8765
+Environment=PYTHONUNBUFFERED=1
+# Environment=AUTH_TOKEN=seu_token_secreto_aqui
+
+[Install]
+WantedBy=multi-user.target

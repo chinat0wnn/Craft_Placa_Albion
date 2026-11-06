@@ -239,10 +239,15 @@ Para encerrar o servidor, pressione `Ctrl + C` no terminal.
 
 ```
 Planilhas_Albion/
-├── Iniciar_Com_Leitor.bat         # Inicialização completa (Site + Leitor em tempo real)
-├── Iniciar_Apenas_Leitor.bat      # Inicialização exclusiva do leitor (para servidor já ativo)
-├── Iniciar_Site.bat               # Atalho para inicialização simples (somente o site)
-├── Planilha_Craft_Placas.xlsx     # Planilha Excel completa e automatizada
+├── AWS_DEPLOY.md                  # Guia completo de deploy na AWS (Lightsail / EC2)
+├── Dockerfile                     # Imagem Docker otimizada para nuvem
+├── docker-compose.yml             # Orquestrador com persistência de dados
+├── Iniciar_Leitor_Nuvem.bat       # Conecta o leitor do jogo direto ao servidor AWS
+├── Iniciar_Com_Leitor.bat         # Inicialização completa local (Site + Leitor)
+├── Iniciar_Apenas_Leitor.bat      # Inicialização do leitor local
+├── Iniciar_Site.bat               # Atalho para o site local
+├── deploy/                        # Scripts de automação na nuvem (setup_aws.sh, nginx.conf)
+├── Planilha_Craft_Placas.xlsx     # Planilha Excel de apoio
 ├── site/                          # Código da aplicação web
 │   ├── server.py                  # Servidor HTTP local (endpoints /api/ingest e /api/live_status)
 │   ├── build_data.py              # Extrator de receitas oficiais do jogo

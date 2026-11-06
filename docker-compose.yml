@@ -1,0 +1,16 @@
+services:
+  albion-craft:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: albion-craft
+    restart: unless-stopped
+    ports:
+      - "${HOST_PORT:-8765}:8765"
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8765
+      - AUTH_TOKEN=${AUTH_TOKEN:-}
+    volumes:
+      # Persistencia do banco de precos e estados no host
+      - ./site/data.json:/app/site/data.json

@@ -1,0 +1,12 @@
+.git
+.github
+*.log*
+*.exe*
+*.xlsx
+scratch/
+__pycache__/
+*.pyc
+*.tmp
+deploy/
+*.bat
+README.md

@@ -22,3 +22,7 @@ tests/
 albiondata-client.log*
 albiondata-client*.exe*
 *.bak
+
+# Environment files (tokens e IPs da nuvem)
+.env
+leitor_nuvem.env
